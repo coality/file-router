@@ -181,9 +181,15 @@ encryption:
   # public_key_file:  C:\ProgramData\FileRouter\keys\peer.pub.asc
   # passphrase_file:  C:\ProgramData\FileRouter\secrets\gpg.pass
 
-  # signing_key_id: private key used to SIGN outbound files.
-  # gnupg: the key id in the keyring. pgpy: any non-empty value ENABLES signing
-  # (the key used is private_key_file); recorded in metadata/journal.
+  # sign_outbound: enable signing of outbound files (backend-agnostic).
+  #   pgpy  -> signs with private_key_file; the REAL key id is recorded.
+  #   gnupg -> set signing_key_id below instead (it both selects the key and
+  #            enables signing).
+  # sign_outbound: true
+
+  # signing_key_id: keyring key id used by the GNUPG backend to SIGN (and, when
+  # set, also enables signing — kept for backward compatibility). Not needed for
+  # pgpy (use sign_outbound + private_key_file).
   signing_key_id: "0xCAFEBABE"
 
   # require_signature_inbound: on the way in, REQUIRE a valid signature.

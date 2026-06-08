@@ -60,6 +60,20 @@ def test_gnupg_binary_defaults_to_none(config_dict: dict) -> None:
     assert load_config_dict(config_dict).encryption.gnupg_binary is None
 
 
+def test_sign_outbound_flag_parsed(config_dict: dict) -> None:
+    """sign_outbound enables signing without a placeholder signing_key_id."""
+    data = copy.deepcopy(config_dict)
+    data["encryption"]["sign_outbound"] = True
+    cfg = load_config_dict(data)
+    assert cfg.encryption.sign_outbound is True
+    assert cfg.encryption.signing_key_id is None  # not required anymore
+
+
+def test_sign_outbound_defaults_false(config_dict: dict) -> None:
+    """Signing is off by default."""
+    assert load_config_dict(config_dict).encryption.sign_outbound is False
+
+
 def test_missing_required_section_rejected(config_dict: dict) -> None:
     """Removing a required section fails schema validation."""
     data = copy.deepcopy(config_dict)

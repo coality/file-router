@@ -56,7 +56,7 @@ def _config(root: Path, keys: Path) -> dict:
                        "private_key_file": str(keys / "priv.asc"),
                        "public_key_file": str(keys / "pub.asc"),
                        "passphrase_file": str(keys / "pass.txt"),
-                       "signing_key_id": "test-signer",
+                       "sign_outbound": True,
                        "rules": [{"base_folder_alias": "PAY", "path_pattern": "**",
                                   "enabled": True}]},
         "compression": {"algorithm": "gzip", "level": 6,
@@ -107,7 +107,9 @@ def test_pgpy_keyfile_roundtrip_and_journal(tmp_path: Path) -> None:
     journal = (tmp_path / "logs" / "transfers.log").read_text(encoding="utf-8")
     assert "OUT  PAY" in journal and "IN   PAY" in journal
     assert journal.count("gzip+encrypted+signed") == 2
-    assert "signer=test-signer" in journal
+    # sign_outbound records the REAL signing-key id (hex), not a placeholder label.
+    import re as _re
+    assert _re.search(r"signer=[0-9A-Fa-f]{8,}", journal)
     assert "sha256(clear)=" in journal
 
 

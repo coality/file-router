@@ -65,6 +65,11 @@ class EncryptionConfig:
     # pgpy backend: file paths only (no key material in the YAML).
     private_key_file: str | None = None   # sign (out) + decrypt (in)
     public_key_file: str | None = None    # encrypt to peer (out) + verify sig (in)
+    # Enable outbound signing explicitly (backend-agnostic). For pgpy the signing
+    # key is private_key_file and the REAL key id is recorded. signing_key_id is
+    # the keyring key id used by the gnupg backend (and also enables signing for
+    # backward compatibility when set).
+    sign_outbound: bool = False
     signing_key_id: str | None = None
     # File holding the private-key passphrase, read at runtime. Secure it so ONLY
     # the service account can read it (NTFS ACL / chmod 600). The env var
@@ -86,6 +91,7 @@ class EncryptionConfig:
             gnupg_binary=data.get("gnupg_binary"),
             private_key_file=data.get("private_key_file"),
             public_key_file=data.get("public_key_file"),
+            sign_outbound=bool(data.get("sign_outbound", False)),
             signing_key_id=data.get("signing_key_id"),
             passphrase_file=data.get("passphrase_file"),
             require_signature_inbound=bool(data.get("require_signature_inbound", True)),

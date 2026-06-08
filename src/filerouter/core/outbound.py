@@ -182,7 +182,7 @@ class OutboundProcessor:
             provider_recipients = getattr(self._ctx.crypto, "recipient_ids", None)
             if provider_recipients is not None:
                 recipients = list(provider_recipients())
-        signing = self._ctx.config.encryption.signing_key_id
+        signing = self._signing_id()
         self._ctx.crypto.encrypt(staged, payload, recipients, signing)
         enc = EncryptionInfo(
             scheme="OpenPGP", recipient_key_ids=recipients,
@@ -191,6 +191,22 @@ class OutboundProcessor:
         self._audit(technical_id, "ENCRYPTED", Direction.OUT,
                     {"recipient_key_ids": recipients, "signing_key_id": signing})
         return payload, enc
+
+    def _signing_id(self) -> str | None:
+        """Resolve the signing identity recorded in metadata (None = do not sign).
+
+        Signing is enabled by ``sign_outbound`` OR (backward compat) by setting
+        ``signing_key_id``. For gnupg the key id selects the keyring key; for
+        file-based backends (pgpy) the key is ``private_key_file`` and we record
+        its REAL key id rather than a placeholder.
+        """
+        enc = self._ctx.config.encryption
+        if not (enc.sign_outbound or enc.signing_key_id):
+            return None
+        if enc.signing_key_id:
+            return enc.signing_key_id
+        provider_signer = getattr(self._ctx.crypto, "signer_id", None)
+        return provider_signer() if provider_signer is not None else None
 
     def _copy(self, src: Path, dst: Path) -> None:
         """Copy bytes via the store (payload == clear when not encrypted)."""

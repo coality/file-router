@@ -87,6 +87,7 @@
         "private_key_file": { "type": "string" },
         "public_key_file": { "type": "string" },
         "passphrase_file": { "type": "string" },
+        "sign_outbound": { "type": "boolean" },
         "signing_key_id": { "type": "string" },
         "require_signature_inbound": { "type": "boolean" },
         "armored": { "type": "boolean" },

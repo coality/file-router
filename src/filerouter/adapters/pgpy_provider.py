@@ -81,6 +81,13 @@ class PGPyProvider:
                 last = exc
         raise CryptoError(f"no encryption-capable (sub)key in public_key_file: {last}")
 
+    def signer_id(self) -> str:
+        """Key id of the signing key (the private key) — recorded in metadata.
+
+        Reading the fingerprint does not require the passphrase.
+        """
+        return str(self._private().fingerprint.keyid)
+
     def recipient_ids(self) -> list[str]:
         """Recipient identifier(s) recorded in metadata: the peer public key id.
 
