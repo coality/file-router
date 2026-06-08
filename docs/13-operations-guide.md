@@ -14,8 +14,15 @@ système de fichiers et la CLI `filerouter` (aucune base de données).
 | `filerouter list-quarantine` | Liste les items en `runtime/error/`. |
 | `filerouter replay <technical_id>` | Rejoue un item en quarantaine. |
 | `filerouter reconcile` | Force une réconciliation immédiate. |
+| `filerouter run` | Lance la boucle de service au premier plan. |
 | `filerouter reload` | Recharge la config (revalidation + swap atomique). |
 | `filerouter keys list` | Liste les clés du trousseau et leurs epochs. |
+
+> **Périmètre v1.0** : sont implémentées `validate-config`, `health`, `trace`,
+> `list-quarantine`, `reconcile` et `run`. Les commandes `status`, `replay`, `reload`
+> et `keys list` sont décrites ici comme cible et seront ajoutées dans une version
+> ultérieure (`list-quarantine` + lecture de `runtime/error/<id>/error.json` couvrent
+> aujourd'hui le diagnostic ; le rejeu se fait pour l'instant en re-déposant la source).
 
 ## 2. Tâches courantes
 

@@ -1,0 +1,7 @@
+# Dépendances figées (référence ; régénérer avec pip freeze en environnement cible).
+PyYAML==6.0.1
+jsonschema==4.10.3
+python-gnupg==0.5.2
+# Optionnel selon le backend / la plateforme :
+# PGPy==0.6.0
+# pywin32==306 ; sys_platform == 'win32'

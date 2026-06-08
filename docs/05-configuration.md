@@ -93,7 +93,7 @@ hashing:
 ### 2.7 `encryption`
 ```yaml
 encryption:
-  backend: gnupg           # gnupg | pgpy
+  backend: gnupg           # gnupg | pgpy | noop (noop = pas de chiffrement)
   gnupg_home: D:\FileRouter\keys\gnupg
   signing_key_id: "0xCAFEBABE"
   require_signature_inbound: true
