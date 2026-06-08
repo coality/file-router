@@ -1,6 +1,6 @@
 """LockManager port: advisory, self-healing file locks.
 
-See docs/03-state-management.md §5.
+See docs/fr/03-state-management.md §5.
 """
 
 from __future__ import annotations

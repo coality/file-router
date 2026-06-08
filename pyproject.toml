@@ -31,6 +31,7 @@ dev = [
 
 [project.scripts]
 filerouter = "filerouter.__main__:main"
+filerouter-doctor = "filerouter.cli.doctor:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

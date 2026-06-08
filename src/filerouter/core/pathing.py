@@ -1,7 +1,7 @@
 """Business-path logic: base_folder identification and relative path computation.
 
 Relative paths are stored POSIX-normalized so they transport between Windows and
-Linux hosts (see docs/04-data-formats.md). Depth is unlimited.
+Linux hosts (see docs/fr/04-data-formats.md). Depth is unlimited.
 """
 
 from __future__ import annotations

@@ -1,7 +1,7 @@
 """Inclusion/exclusion and encryption-rule matching.
 
 Exclusion wins over inclusion. Encryption rules match on (base_folder_alias,
-path_pattern). See docs/05-configuration.md.
+path_pattern). See docs/fr/05-configuration.md.
 """
 
 from __future__ import annotations
@@ -34,6 +34,15 @@ class EncryptionRule:
     recipient_key_ids: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True)
+class CompressionRule:
+    """A single compression rule from config (which files to compress)."""
+
+    base_folder_alias: str
+    path_pattern: str
+    enabled: bool
+
+
 class RuleSet:
     """Compiled inclusion/exclusion and encryption rules."""
 
@@ -42,10 +51,12 @@ class RuleSet:
         inclusion: list[str],
         exclusion: list[str],
         encryption_rules: list[EncryptionRule],
+        compression_rules: list[CompressionRule] | None = None,
     ) -> None:
         self._inclusion = inclusion or ["**/*"]
         self._exclusion = exclusion or []
         self._encryption = encryption_rules or []
+        self._compression = compression_rules or []
 
     def is_eligible(self, rel_file_posix: str) -> bool:
         """Return True if a file (relative POSIX path incl. filename) is eligible."""
@@ -72,6 +83,19 @@ class RuleSet:
             ):
                 return rule
         return None
+
+    def compresses(self, base_folder_alias: str, rel_file_posix: str) -> bool:
+        """Return True if an enabled compression rule matches this file."""
+        for rule in self._compression:
+            if rule.base_folder_alias != base_folder_alias:
+                continue
+            if not rule.enabled:
+                continue
+            if _match(rule.path_pattern, rel_file_posix) or _match(
+                rule.path_pattern, _dir_of(rel_file_posix)
+            ):
+                return True
+        return False
 
 
 def _dir_of(rel_file_posix: str) -> str:

@@ -1,7 +1,7 @@
 """In-process metrics counters/gauges (no network dependency).
 
 A minimal registry that the orchestrator can feed and that can be exported to a
-JSON file or a Prometheus textfile. See docs/08-observability.md §4.
+JSON file or a Prometheus textfile. See docs/fr/08-observability.md §4.
 """
 
 from __future__ import annotations

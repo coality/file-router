@@ -133,9 +133,13 @@ File: `runtime/audit/<technical_id>.audit.json`. Schema:
 | `details` | object | Event-specific payload. |
 
 ### Event vocabulary (exhaustive and minimal)
-`DETECTED`, `HASH_COMPUTED`, `ENCRYPTED`, `RENAMED`, `MOVED_TO_EXCHANGE_OUT`,
-`RECEIVED_FROM_EXCHANGE_IN`, `HASH_VALIDATED`, `DECRYPTED`, `RESTORED`,
-`MOVED_TO_BUSINESS_FOLDER`, `ARCHIVED`, `ERROR`.
+`DETECTED`, `HASH_COMPUTED`, `COMPRESSED`, `ENCRYPTED`, `RENAMED`,
+`MOVED_TO_EXCHANGE_OUT`, `RECEIVED_FROM_EXCHANGE_IN`, `HASH_VALIDATED`, `DECRYPTED`,
+`DECOMPRESSED`, `RESTORED`, `MOVED_TO_BUSINESS_FOLDER`, `ARCHIVED`, `ERROR`.
+
+> `COMPRESSED` (outbound) and `DECOMPRESSED` (inbound) are emitted only when a
+> compression rule applies. The metadata then carries `compressed: true` and
+> `compression: { "algorithm": "gzip" }`.
 
 An `ERROR` event carries `details.step`, `details.exception_type`, `details.message` and
 `details.quarantine_path`. Any `ERROR` is **terminal** for the current pipeline until

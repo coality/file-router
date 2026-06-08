@@ -1,6 +1,6 @@
 """CLI commands. Each command is a small function returning an exit code.
 
-Commands map to docs/13-operations-guide.md §1: validate-config, health, trace,
+Commands map to docs/fr/13-operations-guide.md §1: validate-config, health, trace,
 status, list-quarantine, reconcile.
 """
 
@@ -69,6 +69,15 @@ def cmd_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_doctor(args: argparse.Namespace) -> int:
+    """Diagnose the configuration and environment (alias of filerouter-doctor)."""
+    from filerouter.cli.doctor import Doctor, ask_yes_no  # lazy import
+
+    # --yes turns the asker into an always-yes asker (unattended repair).
+    asker = (lambda _p: True) if getattr(args, "yes", False) else ask_yes_no
+    return Doctor(args.config, asker=asker).run(apply_fixes=getattr(args, "fix", False))
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the argparse parser wiring every subcommand."""
     parser = argparse.ArgumentParser(prog="filerouter", description="FileRouter CLI")
@@ -81,6 +90,11 @@ def build_parser() -> argparse.ArgumentParser:
     _add(sub, "run", cmd_run)
     trace = _add(sub, "trace", cmd_trace)
     trace.add_argument("technical_id", help="technical_id to trace")
+    doctor = _add(sub, "doctor", cmd_doctor)
+    doctor.add_argument("--fix", action="store_true",
+                        help="offer to fix safe problems")
+    doctor.add_argument("--yes", action="store_true",
+                        help="with --fix, apply every safe fix without asking")
     return parser
 
 

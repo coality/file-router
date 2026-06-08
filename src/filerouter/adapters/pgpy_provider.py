@@ -2,7 +2,7 @@
 
 PGPy is imported lazily so the package works without it installed. This adapter
 covers the same CryptoProvider contract; it is a documented alternative for hosts
-where installing the gpg binary is undesirable (see docs/06-encryption.md §1).
+where installing the gpg binary is undesirable (see docs/fr/06-encryption.md §1).
 """
 
 from __future__ import annotations

@@ -1,7 +1,7 @@
 """FileStore port: atomic filesystem operations.
 
 The adapter guarantees atomic publish (write-to-temp then atomic rename) and
-handles cross-volume moves explicitly. See docs/03-state-management.md.
+handles cross-volume moves explicitly. See docs/fr/03-state-management.md.
 """
 
 from __future__ import annotations

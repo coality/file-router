@@ -2,9 +2,9 @@
 
 Toute la configuration est externalisée au format **YAML**. **Aucun paramètre métier n'est
 codé en dur.** Le fichier est validé au démarrage contre
-[`schemas/config.schema.json`](schemas/config.schema.json) ; une config invalide interrompt
+[`schemas/config.schema.json`](../schemas/config.schema.json) ; une config invalide interrompt
 le démarrage (fail-fast). Un exemple complet figure dans
-[`examples/config.example.yaml`](examples/config.example.yaml).
+[`examples/config.example.yaml`](../examples/config.example.yaml).
 
 ## 1. Sections configurables (vue d'ensemble)
 
@@ -108,6 +108,23 @@ encryption:
       recipient_key_ids: ["0xDEADBEEF"]
 ```
 Détails du modèle de clés, rotation et signature : [06 — Chiffrement](06-encryption.md).
+
+### 2.7bis `compression`
+Compression **gzip** optionnelle des fichiers, **configurable par règle**. La compression
+a lieu **avant** le chiffrement (`clair → compresse → chiffre → payload`) ; en entrée,
+l'ordre inverse est appliqué après vérification du hash payload et déchiffrement.
+```yaml
+compression:
+  algorithm: gzip          # gzip | none
+  level: 6                 # niveau gzip 1..9
+  rules:
+    - base_folder_alias: PAYMENT
+      path_pattern: "**"
+      enabled: true
+```
+La metadata porte alors `compressed: true` et `compression.algorithm`. Le `clear_file_hash`
+reste calculé sur le contenu **d'origine** (intégrité de bout en bout préservée). Voir
+[04 — Formats de données](04-data-formats.md).
 
 ### 2.8 `inclusion` / `exclusion`
 ```yaml

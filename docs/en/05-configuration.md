@@ -109,6 +109,23 @@ encryption:
 ```
 Key model, rotation and signing details: [06 — Encryption](06-encryption.md).
 
+### 2.7bis `compression`
+Optional **gzip** payload compression, **configurable per rule**. Compression happens
+**before** encryption (`clear → compress → encrypt → payload`); on the way in the reverse
+order is applied after the payload-hash check and decryption.
+```yaml
+compression:
+  algorithm: gzip          # gzip | none
+  level: 6                 # gzip level 1..9
+  rules:
+    - base_folder_alias: PAYMENT
+      path_pattern: "**"
+      enabled: true
+```
+The metadata then carries `compressed: true` and `compression.algorithm`. The
+`clear_file_hash` is still computed on the **original** content (end-to-end integrity
+preserved). See [04 — Data formats](04-data-formats.md).
+
 ### 2.8 `inclusion` / `exclusion`
 ```yaml
 inclusion:

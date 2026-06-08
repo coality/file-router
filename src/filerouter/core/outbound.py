@@ -1,6 +1,6 @@
 """Outbound pipeline: business folder -> exchange_out.
 
-Implements the 10-step outbound flow (docs/02-flows.md §1). Every step is a
+Implements the 10-step outbound flow (docs/fr/02-flows.md §1). Every step is a
 small, documented method. The whole pipeline is transactional: on any failure
 the item is quarantined and the source is never lost (it lives in
 processing/<id>/ until publish is confirmed).
@@ -12,7 +12,7 @@ import hashlib
 from dataclasses import dataclass
 from pathlib import Path, PurePath
 
-from filerouter.core import hashing, metadata as meta_mod, naming
+from filerouter.core import compression, hashing, metadata as meta_mod, naming
 from filerouter.core.context import Context
 from filerouter.core.errors import FileRouterError
 from filerouter.core.models import Direction, EncryptionInfo, FileHash, Metadata
@@ -83,12 +83,14 @@ class OutboundProcessor:
             return Outcome("skipped_duplicate", technical_id)
 
         rule = self._encryption_rule(alias, rel_dir, original)
-        payload, enc_info = self._make_payload(clear, work, rule, technical_id)
+        compress = self._compresses(alias, rel_dir, original)
+        payload, enc_info, comp_info = self._make_payload(
+            clear, work, rule, compress, technical_id)
         payload_hash = self._hash(payload, technical_id, "payload")
 
         technical_name = self._render_name(alias, original, technical_id)
         meta = self._build_metadata(
-            technical_id, alias, rel_dir, original, enc_info,
+            technical_id, alias, rel_dir, original, enc_info, comp_info,
             clear_hash, payload_hash, technical_name, clear,
         )
         self._publish(payload, meta, technical_name, technical_id)
@@ -139,16 +141,43 @@ class OutboundProcessor:
         rel_file = f"{rel_dir}/{original}" if rel_dir else original
         return self._ctx.config.ruleset.encryption_for(alias, rel_file)
 
-    def _make_payload(self, clear: Path, work: Path, rule, technical_id: str):
-        """Produce the payload (encrypt+sign if a rule matches, else copy)."""
+    def _compresses(self, alias: str, rel_dir: str, original: str) -> bool:
+        """Return True if a compression rule matches this file."""
+        rel_file = f"{rel_dir}/{original}" if rel_dir else original
+        return self._ctx.config.ruleset.compresses(alias, rel_file)
+
+    def _make_payload(self, clear: Path, work: Path, rule, compress: bool,
+                      technical_id: str):
+        """Build the payload: optional gzip compression THEN optional encryption.
+
+        Order matters: compressing before encrypting keeps a good ratio, since
+        encrypted bytes do not compress. Returns (payload, enc_info, comp_info).
+        """
+        staged, comp_info = self._maybe_compress(clear, work, compress, technical_id)
+        payload, enc_info = self._maybe_encrypt(staged, work, rule, technical_id)
+        return payload, enc_info, comp_info
+
+    def _maybe_compress(self, clear: Path, work: Path, compress: bool,
+                        technical_id: str):
+        """Gzip the clear file when requested; else pass the clear file through."""
+        if not compress:
+            return clear, None
+        staged = work / "compressed"
+        compression.compress_file(clear, staged, self._ctx.config.compression.level)
+        self._audit(technical_id, "COMPRESSED", Direction.OUT,
+                    {"algorithm": compression.ALGORITHM})
+        return staged, {"algorithm": compression.ALGORITHM}
+
+    def _maybe_encrypt(self, staged: Path, work: Path, rule, technical_id: str):
+        """Encrypt+sign the staged file when a rule matches; else copy it."""
         payload = work / "payload"
         if rule is None:
-            # No rule: payload is a byte-for-byte copy of the clear file.
-            self._copy(clear, payload)
+            # No rule: payload is a byte-for-byte copy of the staged file.
+            self._copy(staged, payload)
             return payload, None
         recipients = list(rule.recipient_key_ids)
         signing = self._ctx.config.encryption.signing_key_id
-        self._ctx.crypto.encrypt(clear, payload, recipients, signing)
+        self._ctx.crypto.encrypt(staged, payload, recipients, signing)
         enc = EncryptionInfo(
             scheme="OpenPGP", recipient_key_ids=recipients,
             signing_key_id=signing, signed=signing is not None,
@@ -180,7 +209,8 @@ class OutboundProcessor:
         return name
 
     def _build_metadata(self, technical_id, alias, rel_dir, original, enc_info,
-                        clear_hash, payload_hash, technical_name, clear) -> Metadata:
+                        comp_info, clear_hash, payload_hash, technical_name,
+                        clear) -> Metadata:
         """Assemble the metadata object (validated later on serialization)."""
         return Metadata(
             schema_version=METADATA_SCHEMA_VERSION,
@@ -199,6 +229,8 @@ class OutboundProcessor:
             extension=_extension(original),
             size_bytes=self._ctx.store.size(clear),
             encryption=enc_info,
+            compressed=comp_info is not None,
+            compression=comp_info,
             naming={"pattern": self._ctx.config.naming.pattern},
             producer={"app": "FileRouter", "host": self._ctx.host},
         )

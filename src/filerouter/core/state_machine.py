@@ -1,4 +1,4 @@
-"""Per-file state machine helpers (see docs/03-state-management.md §2).
+"""Per-file state machine helpers (see docs/fr/03-state-management.md §2).
 
 The current state of a file is implicit in its location plus its audit trail.
 This module centralizes the legal terminal/quarantine moves so processors do not

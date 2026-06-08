@@ -1,6 +1,6 @@
 """Inbound pipeline: exchange_in -> business folder.
 
-Implements the 8-step inbound flow (docs/02-flows.md §2) with strict validation
+Implements the 8-step inbound flow (docs/fr/02-flows.md §2) with strict validation
 order. A payload in exchange_in may still be uploading, or its metadata may not
 have arrived yet; readiness is decided WITHOUT a database, from pair presence,
 file stability and file age (see ``InboundReadiness``).
@@ -12,7 +12,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from filerouter.core import hashing, metadata as meta_mod
+from filerouter.core import compression, hashing, metadata as meta_mod
 from filerouter.core.context import Context
 from filerouter.core.errors import CryptoError, DataError, IntegrityError
 from filerouter.core.models import Direction, Metadata, VerificationResult
@@ -116,7 +116,8 @@ class InboundProcessor:
 
         work = self._move_pair_in(payload, meta_path, technical_id, meta)
         self._verify_payload_hash(work.payload, meta, technical_id)
-        clear = self._decrypt_or_passthrough(work.payload, work.dir, meta, technical_id)
+        staged = self._decrypt_or_passthrough(work.payload, work.dir, meta, technical_id)
+        clear = self._maybe_decompress(staged, work.dir, meta, technical_id)
         self._verify_clear_hash(clear, meta, technical_id)
         self._deliver(clear, meta, technical_id)
         self._cleanup(work.dir)
@@ -148,14 +149,28 @@ class InboundProcessor:
 
     def _decrypt_or_passthrough(self, payload: Path, work_dir: Path, meta: Metadata,
                                 technical_id: str) -> Path:
-        """Decrypt+verify signature if encrypted, else use the payload as clear."""
+        """Decrypt+verify signature if encrypted, else pass the payload through.
+
+        Returns the decrypted file (which may still be compressed) or the payload.
+        """
         if not meta.encrypted:
             return payload
-        clear = work_dir / "clear"
-        result = self._ctx.crypto.decrypt(payload, clear)
+        decrypted = work_dir / "decrypted"
+        result = self._ctx.crypto.decrypt(payload, decrypted)
         self._enforce_signature(result, meta)
         self._audit(technical_id, "DECRYPTED", meta,
                     {"signer_key_id": result.signer_key_id})
+        return decrypted
+
+    def _maybe_decompress(self, staged: Path, work_dir: Path, meta: Metadata,
+                          technical_id: str) -> Path:
+        """Decompress the staged file when the metadata says it was compressed."""
+        if not meta.compressed:
+            return staged
+        clear = work_dir / "clear"
+        compression.decompress_file(staged, clear)
+        self._audit(technical_id, "DECOMPRESSED", meta,
+                    {"algorithm": (meta.compression or {}).get("algorithm")})
         return clear
 
     def _enforce_signature(self, result: VerificationResult, meta: Metadata) -> None:

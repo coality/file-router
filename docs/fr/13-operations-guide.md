@@ -15,14 +15,32 @@ système de fichiers et la CLI `filerouter` (aucune base de données).
 | `filerouter replay <technical_id>` | Rejoue un item en quarantaine. |
 | `filerouter reconcile` | Force une réconciliation immédiate. |
 | `filerouter run` | Lance la boucle de service au premier plan. |
+| `filerouter doctor [--fix] [--yes]` | Diagnostic config/environnement (+ réparation). |
+| `filerouter-doctor --config <…> [--fix] [--yes]` | Même diagnostic, outil dédié. |
 | `filerouter reload` | Recharge la config (revalidation + swap atomique). |
 | `filerouter keys list` | Liste les clés du trousseau et leurs epochs. |
 
 > **Périmètre v1.0** : sont implémentées `validate-config`, `health`, `trace`,
-> `list-quarantine`, `reconcile` et `run`. Les commandes `status`, `replay`, `reload`
-> et `keys list` sont décrites ici comme cible et seront ajoutées dans une version
-> ultérieure (`list-quarantine` + lecture de `runtime/error/<id>/error.json` couvrent
-> aujourd'hui le diagnostic ; le rejeu se fait pour l'instant en re-déposant la source).
+> `list-quarantine`, `reconcile`, `run` et `doctor` (+ l'outil `filerouter-doctor`).
+> Les commandes `status`, `replay`, `reload` et `keys list` sont décrites ici comme
+> cible et seront ajoutées dans une version ultérieure.
+
+### 1bis. `filerouter-doctor` — diagnostic & réparation
+
+Anticipe les problèmes avant la mise en production. Contrôles : config (schéma +
+cohérence), existence et **droits** des répertoires (`base_folders`, `exchange`,
+`runtime`), `runtime`/`exchange` sur le **même volume**, backend cryptographique et
+**présence des clés** (auto-test GnuPG, clés destinataire/signature, signataires
+autorisés), règles de chiffrement/compression référençant des alias connus.
+
+- **Tous les problèmes** sont listés sur la sortie standard ; chaque problème non
+  réparable est accompagné d'une **solution claire adaptée Linux/Windows**
+  (`gpg --import`, `chmod`/`chown` sous Linux, `icacls` sous Windows, même volume…).
+- `--fix` : propose de corriger les problèmes sûrs (création de répertoires) en posant
+  une question avant chaque correction.
+- `--fix --yes` : **réparation automatique** sans aucune question. La config est
+  re-diagnostiquée après réparation (code de sortie reflétant l'état final).
+- Le doctor ne corrige jamais automatiquement ce qui touche à la sécurité (clés, droits).
 
 ## 2. Tâches courantes
 

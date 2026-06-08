@@ -1,122 +1,314 @@
-# FileRouter — configuration de référence
-# Validée contre docs/schemas/config.schema.json
+# =============================================================================
+# FileRouter — reference configuration file (heavily commented)
+# =============================================================================
+#
+# HOW TO READ THIS FILE
+#   - Every section and every key is explained right above it.
+#   - The values below are EXAMPLES: adapt paths, aliases and keys to your site.
+#   - YAML format. Comments start with "#".
+#   - Always validate before starting:  filerouter --config <this_file> validate-config
+#   - Full reference:  docs/en/05-configuration.md  (FR: docs/fr/05-configuration.md)
+#
+# GOLDEN RULE
+#   No business parameter is hard-coded in the application: everything lives here.
+# =============================================================================
 
+
+# -----------------------------------------------------------------------------
+# instance — identity of THIS installation and parallelism level.
+# -----------------------------------------------------------------------------
 instance:
+  # site: logical name of the current site/server. Used as "source_site" for
+  # files produced here (recorded in the metadata). E.g. PARIS, FRANKFURT.
   site: PARIS
+
+  # role: what this instance does.
+  #   outbound = handle outbound only (business -> exchange_out)
+  #   inbound  = handle inbound only (exchange_in -> business)
+  #   both     = handle both (common on a single server)
   role: both
+
+  # workers: number of files processed IN PARALLEL. Increase for more throughput
+  # if the disk can keep up. A per-file lock guarantees there is no race.
   workers: 8
+
+  # worker_type: "thread" (lightweight, default) or "process" (stronger isolation).
   worker_type: thread
 
+
+# -----------------------------------------------------------------------------
+# base_folders — your BUSINESS ROOTS. Unlimited number.
+#   alias: LOGICAL identifier, identical on every server. Only the alias travels
+#          with the file; it enables routing without exposing physical paths.
+#   path : PHYSICAL path LOCAL to THIS server (may differ between sites).
+# Each file belongs to exactly one base_folder (longest-prefix match).
+# -----------------------------------------------------------------------------
 base_folders:
   - alias: SAP_FR
-    path: D:\interfaces\sap\fr
+    path: D:\interfaces\sap\fr        # on another server: E:\imports\sap_fr
   - alias: CRM_DE
     path: E:\interfaces\crm\de
   - alias: PAYMENT
     path: F:\payments
 
+
+# -----------------------------------------------------------------------------
+# mappings — per-alias lookup tables.
+# -----------------------------------------------------------------------------
 mappings:
+  # flows: alias -> label used in the technical name ({flow}).
+  # Gives a support-friendly filename, independent of the alias.
   flows:
     PAYMENT: PAYMENT
     SAP_FR: SAPFR
     CRM_DE: CRMDE
+
+  # routing: alias -> destination site. Fills "target_site" in the metadata
+  # (purely informational/traceability; the transport itself is external).
   routing:
     PAYMENT: FRANKFURT
     SAP_FR: PARIS
     CRM_DE: BERLIN
 
+
+# -----------------------------------------------------------------------------
+# exchange — FLAT exchange directories (no sub-directories are ever created).
+#   out: files ready to leave (produced by the outbound pipeline).
+#   in : files received to integrate (consumed by the inbound pipeline).
+# The actual transfer between one site's out and another site's in is EXTERNAL
+# (outside FileRouter).
+# -----------------------------------------------------------------------------
 exchange:
   out: D:\FileRouter\exchange_out
   in: D:\FileRouter\exchange_in
 
+
+# -----------------------------------------------------------------------------
+# runtime — root of the TECHNICAL directories (staging, processing, audit,
+# locks, temp, archive, error, dedup). Created automatically at startup.
+# IMPORTANT: runtime MUST be on the SAME VOLUME as exchange so that publish
+# operations are atomic renames (data-loss protection).
+# -----------------------------------------------------------------------------
 runtime:
   root: D:\FileRouter\runtime
 
+
+# -----------------------------------------------------------------------------
+# naming — the TECHNICAL NAME convention used in the exchange directories.
+# -----------------------------------------------------------------------------
 naming:
+  # pattern: name template. Available placeholders:
+  #   {flow} {direction} {timestamp} {technical_id} {extension}
+  #   {base_folder_alias} {source_site} {target_site}
+  # {technical_id} is MANDATORY (guarantees uniqueness).
   pattern: "{flow}_{direction}_{timestamp}_{technical_id}.{extension}"
+
+  # timestamp_format: format of {timestamp} (strftime). E.g. -> 20260608T120000
   timestamp_format: "%Y%m%dT%H%M%S"
+
+  # max_length: maximum technical-name length. Beyond it -> error + quarantine
+  # (protects against Windows path limits).
   max_length: 120
+
+  # technical_id_strategy: "ulid" (time-sortable, recommended) or "uuid4".
   technical_id_strategy: ulid
+
+  # charset: "portable" forbids characters illegal on Windows and reserved names
+  # (CON, PRN...). "extended" is more permissive (not recommended).
   charset: portable
+
+  # meta_suffix: suffix of the metadata file that accompanies each payload.
+  # E.g. payload "PAYMENT_OUT_..._ABC123.csv" -> metadata "...ABC123.csv.meta.json".
   meta_suffix: ".meta.json"
 
+
+# -----------------------------------------------------------------------------
+# hashing — integrity via digest. Imposed algorithm: SHA-256.
+# -----------------------------------------------------------------------------
 hashing:
+  # algorithm: must be "SHA-256" (only accepted value).
   algorithm: SHA-256
+
+  # chunk_size_bytes: streaming read size (constant memory even for very large
+  # files). 1 MiB by default.
   chunk_size_bytes: 1048576
+
+  # verify_inbound: re-verify digests on the way in (payload then clear).
+  # Keep true in production.
   verify_inbound: true
 
-encryption:
-  backend: gnupg
-  gnupg_home: D:\FileRouter\keys\gnupg
-  signing_key_id: "0xCAFEBABE"
-  require_signature_inbound: true
-  armored: false
+
+# -----------------------------------------------------------------------------
+# compression — optional gzip compression of files, configurable PER RULE.
+# Compression happens BEFORE encryption (clear -> compress -> encrypt -> payload);
+# the clear_file_hash is still computed on the ORIGINAL content.
+# -----------------------------------------------------------------------------
+compression:
+  # algorithm: "gzip" or "none".
+  algorithm: gzip
+  # level: gzip level 1 (fastest) .. 9 (smallest).
+  level: 6
+  # rules: WHICH files to compress (alias + relative-path glob).
   rules:
-    - base_folder_alias: SAP_FR
-      path_pattern: "confidential/**"
+    - base_folder_alias: PAYMENT
+      path_pattern: "**"
       enabled: true
-      recipient_key_ids: ["0xDEADBEEF"]
+
+
+# -----------------------------------------------------------------------------
+# encryption — OpenPGP encryption/signing, configurable PER RULE.
+# -----------------------------------------------------------------------------
+encryption:
+  # backend: cryptographic engine.
+  #   gnupg = GnuPG (recommended in production; the gpg binary is required)
+  #   pgpy  = pure-Python implementation (alternative)
+  #   noop  = NO encryption (files travel in clear)
+  backend: gnupg
+
+  # gnupg_home: keyring dedicated to FileRouter (keys imported by operations).
+  gnupg_home: D:\FileRouter\keys\gnupg
+
+  # signing_key_id: private key used to SIGN outbound files.
+  signing_key_id: "0xCAFEBABE"
+
+  # require_signature_inbound: on the way in, REQUIRE a valid signature.
+  # When true (recommended), an unsigned/badly-signed file is quarantined.
+  require_signature_inbound: true
+
+  # armored: false = binary output (compact, default); true = ASCII "armored".
+  armored: false
+
+  # allowed_signers: WHITELIST of signing keys authorized on the way in.
+  # Security: a "valid" signature is not enough, the signer must be listed here.
+  # Leave empty to require only a valid signature (without restricting the sender).
+  allowed_signers:
+    - "0xCAFEBABE"
+
+  # rules: WHO to encrypt. A rule applies when the alias matches AND the file's
+  # relative path matches path_pattern.
+  rules:
+    # Example 1: encrypt only the "confidential/" sub-tree of SAP_FR.
+    - base_folder_alias: SAP_FR
+      path_pattern: "confidential/**"   # ** = this directory and everything below
+      enabled: true
+      recipient_key_ids: ["0xDEADBEEF"] # recipient PUBLIC key(s)
+    # Example 2: encrypt the whole PAYMENT flow.
     - base_folder_alias: PAYMENT
       path_pattern: "**"
       enabled: true
       recipient_key_ids: ["0xDEADBEEF"]
 
+
+# -----------------------------------------------------------------------------
+# inclusion / exclusion — which files are ELIGIBLE (globs on the relative path).
+# EXCLUSION WINS over inclusion.
+# -----------------------------------------------------------------------------
 inclusion:
-  patterns: ["**/*"]
+  patterns:
+    - "**/*"                # default: everything is eligible
 
 exclusion:
   patterns:
-    - "**/*.tmp"
-    - "**/*.part"
-    - "**/~$*"
-    - "**/.DS_Store"
+    - "**/*.tmp"            # temporary files
+    - "**/*.part"           # partial downloads
+    - "**/~$*"              # Office lock files
+    - "**/.DS_Store"        # macOS metadata
 
+
+# -----------------------------------------------------------------------------
+# duplicates — duplicate handling (no database).
+# -----------------------------------------------------------------------------
 duplicates:
+  # outbound_policy: "skip" ignores already-routed content (same hash+alias+path),
+  # "reprocess" routes it again, "error" quarantines it.
   outbound_policy: skip
+  # inbound_policy: "skip" ignores an already-delivered file, "overwrite"
+  # overwrites, "error" quarantines for arbitration.
   inbound_policy: skip
-  index: runtime/dedup
 
+
+# -----------------------------------------------------------------------------
+# archival — what to do with the SOURCE after a successful outbound.
+# -----------------------------------------------------------------------------
 archival:
+  # source_policy: "archive" keeps the source (traceability/reprocessing),
+  # "delete" removes it.
   source_policy: archive
+  # archive_layout: dated sub-tree under runtime/archive (strftime).
   archive_layout: "%Y/%m/%d"
 
-retention:
-  archive_days: 30
-  audit_days: 365
-  logs_days: 90
-  error_days: 0
-  dedup_days: 30
 
+# -----------------------------------------------------------------------------
+# retention — automatic purge by AGE (in days). 0 = never purge.
+# Quarantine (error/) is NEVER purged automatically.
+# -----------------------------------------------------------------------------
+retention:
+  archive_days: 30         # archived sources
+  audit_days: 365          # audit logs (legal trail -> long retention)
+  logs_days: 90            # operational logs
+  error_days: 0            # quarantine: 0 = never auto-deleted
+  dedup_days: 30           # duplicate markers
+
+
+# -----------------------------------------------------------------------------
+# scanning — detection cadence and stability/pairing windows.
+# -----------------------------------------------------------------------------
 scanning:
+  # interval_seconds: delay between two scan passes.
   interval_seconds: 5
+  # stability_checks: number of polls to confirm a file is no longer being
+  # written (size/mtime unchanged). 1 = a single stat, with no waiting.
   stability_checks: 3
+  # stability_interval_seconds: delay between two stability polls.
   stability_interval_seconds: 2
+  # pair_grace_period_seconds: on the way in, how long to tolerate a payload
+  # whose metadata has not arrived yet before quarantining it.
   pair_grace_period_seconds: 30
 
+
+# -----------------------------------------------------------------------------
+# locking — cooperative, self-healing locks (single writer per file).
+# -----------------------------------------------------------------------------
 locking:
+  # lock_ttl_seconds: past this delay without a heartbeat, a lock is considered
+  # abandoned (crashed worker) and may be reclaimed.
   lock_ttl_seconds: 300
+  # heartbeat_interval_seconds: how often the lock is refreshed.
   heartbeat_interval_seconds: 30
 
+
+# -----------------------------------------------------------------------------
+# retry — retries, ONLY for transient IO errors.
+# (Integrity/crypto/config errors are NEVER retried.)
+# -----------------------------------------------------------------------------
 retry:
   max_attempts: 5
   base_delay_seconds: 2
-  backoff: exponential
-  jitter: true
+  backoff: exponential     # "fixed" or "exponential"
+  jitter: true             # adds randomness to avoid synchronized bursts
 
+
+# -----------------------------------------------------------------------------
+# logging — structured JSON Lines logs, 4 streams correlated by technical_id.
+# -----------------------------------------------------------------------------
 logging:
   format: jsonl
   streams:
-    technical: { level: INFO, path: logs/technical }
-    functional: { level: INFO, path: logs/functional }
-    security: { level: INFO, path: logs/security }
-    admin: { level: INFO, path: logs/admin }
+    technical: { level: INFO, path: logs/technical }   # execution detail
+    functional: { level: INFO, path: logs/functional } # business view
+    security: { level: INFO, path: logs/security }     # crypto, integrity, access
+    admin: { level: INFO, path: logs/admin }           # service lifecycle
   rotation:
-    when: daily
-    max_bytes: 104857600
+    when: daily            # "daily" or "size"
+    max_bytes: 104857600   # used when when=size
     backup_count: 30
-  compression: gzip
+  compression: gzip        # "none" or "gzip"
 
+
+# -----------------------------------------------------------------------------
+# recovery — reconciliation / crash recovery.
+# -----------------------------------------------------------------------------
 recovery:
-  reconcile_on_start: true
-  reconcile_interval_seconds: 300
-  temp_orphan_max_age_seconds: 600
+  reconcile_on_start: true            # run recovery at startup
+  reconcile_interval_seconds: 300     # then periodically
+  temp_orphan_max_age_seconds: 600    # age beyond which a temp/ scratch is purged

@@ -1,4 +1,4 @@
-"""Runtime directory layout (see docs/03-state-management.md §1).
+"""Runtime directory layout (see docs/fr/03-state-management.md §1).
 
 Centralizes the technical directory tree so every component agrees on paths.
 ``runtime`` and the exchange directories should share one volume so that

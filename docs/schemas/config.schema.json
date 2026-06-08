@@ -86,6 +86,7 @@
         "signing_key_id": { "type": "string" },
         "require_signature_inbound": { "type": "boolean" },
         "armored": { "type": "boolean" },
+        "allowed_signers": { "type": "array", "items": { "type": "string" } },
         "rules": {
           "type": "array",
           "items": {
@@ -97,6 +98,27 @@
               "path_pattern": { "type": "string" },
               "enabled": { "type": "boolean" },
               "recipient_key_ids": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    "compression": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": { "type": "string", "enum": ["gzip", "none"] },
+        "level": { "type": "integer", "minimum": 1, "maximum": 9 },
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["base_folder_alias", "path_pattern", "enabled"],
+            "properties": {
+              "base_folder_alias": { "type": "string" },
+              "path_pattern": { "type": "string" },
+              "enabled": { "type": "boolean" }
             }
           }
         }

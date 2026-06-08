@@ -1,7 +1,7 @@
 """Filesystem-based duplicate index (no database).
 
 A marker file ``runtime/dedup/<hash[:2]>/<hash>`` is created atomically with
-O_EXCL; first-arrival-wins. See docs/09-error-handling.md §5.
+O_EXCL; first-arrival-wins. See docs/fr/09-error-handling.md §5.
 """
 
 from __future__ import annotations

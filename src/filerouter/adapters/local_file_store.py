@@ -1,6 +1,6 @@
 """LocalFileStore: filesystem adapter with atomic publish semantics.
 
-See docs/03-state-management.md §4 for the atomicity rules.
+See docs/fr/03-state-management.md §4 for the atomicity rules.
 """
 
 from __future__ import annotations

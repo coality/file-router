@@ -3,7 +3,7 @@
 Renders the configurable technical filename from a placeholder pattern, enforces
 max length and a portable charset, and guarantees a unique technical_id. The
 original name is NOT derived from the technical name; it is restored from
-metadata. See docs/04-data-formats.md.
+metadata. See docs/fr/04-data-formats.md.
 """
 
 from __future__ import annotations

@@ -2,7 +2,7 @@
 
 One file per technical_id under ``runtime/audit``. Events are appended with a
 monotonic ``seq``; the full history is reconstructible by replaying the file in
-seq order. See docs/04-data-formats.md.
+seq order. See docs/fr/04-data-formats.md.
 """
 
 from __future__ import annotations

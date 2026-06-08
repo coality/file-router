@@ -1,4 +1,4 @@
-"""Error taxonomy (see docs/09-error-handling.md).
+"""Error taxonomy (see docs/fr/09-error-handling.md).
 
 The transient/permanent distinction drives the retry strategy: only
 ``TransientError`` instances are retried.

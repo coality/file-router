@@ -4,7 +4,7 @@ This module turns the validated YAML dict into small, immutable dataclasses that
 the core consumes. Each ``from_dict`` helper is intentionally tiny and documented
 so the mapping from YAML to objects stays obvious.
 
-See docs/05-configuration.md for the YAML contract.
+See docs/fr/05-configuration.md for the YAML contract.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from typing import Any
 from filerouter.core.layout import RuntimeLayout
 from filerouter.core.naming import NamingConfig
 from filerouter.core.pathing import BaseFolder
-from filerouter.core.rules import EncryptionRule, RuleSet
+from filerouter.core.rules import CompressionRule, EncryptionRule, RuleSet
 
 
 @dataclass(frozen=True)
@@ -90,6 +90,22 @@ def _encryption_rule(data: dict[str, Any]) -> EncryptionRule:
         enabled=bool(data["enabled"]),
         recipient_key_ids=tuple(data.get("recipient_key_ids", [])),
     )
+
+
+@dataclass(frozen=True)
+class CompressionConfig:
+    """Payload compression options (YAML ``compression``)."""
+
+    algorithm: str = "gzip"  # "gzip" | "none"
+    level: int = 6
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "CompressionConfig":
+        """Build compression config; rules live in the shared RuleSet."""
+        return cls(
+            algorithm=data.get("algorithm", "gzip"),
+            level=int(data.get("level", 6)),
+        )
 
 
 @dataclass(frozen=True)
@@ -176,6 +192,7 @@ class Config:
     naming: NamingConfig
     hashing: HashingConfig
     encryption: EncryptionConfig
+    compression: CompressionConfig
     ruleset: RuleSet
     scanning: ScanningConfig
     retry: RetryConfig
@@ -215,6 +232,7 @@ def build_config(data: dict[str, Any]) -> Config:
         naming=_naming(data["naming"]),
         hashing=HashingConfig.from_dict(data.get("hashing", {})),
         encryption=EncryptionConfig.from_dict(data.get("encryption", {})),
+        compression=CompressionConfig.from_dict(data.get("compression", {})),
         ruleset=ruleset,
         scanning=ScanningConfig.from_dict(data.get("scanning", {})),
         retry=RetryConfig.from_dict(data.get("retry", {})),
@@ -258,4 +276,15 @@ def _ruleset(data: dict[str, Any]) -> RuleSet:
     inclusion = list(data.get("inclusion", {}).get("patterns", ["**/*"]))
     exclusion = list(data.get("exclusion", {}).get("patterns", []))
     rules = [_encryption_rule(r) for r in data.get("encryption", {}).get("rules", [])]
-    return RuleSet(inclusion=inclusion, exclusion=exclusion, encryption_rules=rules)
+    comp = [_compression_rule(r) for r in data.get("compression", {}).get("rules", [])]
+    return RuleSet(inclusion=inclusion, exclusion=exclusion, encryption_rules=rules,
+                   compression_rules=comp)
+
+
+def _compression_rule(data: dict[str, Any]) -> CompressionRule:
+    """Map one YAML compression rule entry to a CompressionRule."""
+    return CompressionRule(
+        base_folder_alias=data["base_folder_alias"],
+        path_pattern=data["path_pattern"],
+        enabled=bool(data["enabled"]),
+    )

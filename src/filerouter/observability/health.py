@@ -1,7 +1,7 @@
 """Health check: a self-test summarizing service readiness.
 
 Produces a small dict consumable by an external probe (and writable to
-runtime/health.json). See docs/08-observability.md §5.
+runtime/health.json). See docs/fr/08-observability.md §5.
 """
 
 from __future__ import annotations

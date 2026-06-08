@@ -2,7 +2,7 @@
 
 Deletion is per-file, idempotent and interruptible: a crash mid-sweep simply
 resumes next cycle. Quarantine (error/) is never purged automatically. See
-docs/11-archival-retention.md.
+docs/fr/11-archival-retention.md.
 """
 
 from __future__ import annotations

@@ -1,7 +1,7 @@
 """CryptoProvider port: OpenPGP encryption, decryption, signing, verification.
 
 Backends: GnuPG (python-gnupg), PGPy, or a no-op passthrough. See
-docs/06-encryption.md.
+docs/fr/06-encryption.md.
 """
 
 from __future__ import annotations

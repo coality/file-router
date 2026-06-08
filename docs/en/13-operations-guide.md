@@ -15,14 +15,31 @@ file system and the `filerouter` CLI (no database).
 | `filerouter replay <technical_id>` | Replays a quarantined item. |
 | `filerouter reconcile` | Forces an immediate reconciliation. |
 | `filerouter run` | Runs the service loop in the foreground. |
+| `filerouter doctor [--fix] [--yes]` | Diagnose config/environment (+ repair). |
+| `filerouter-doctor --config <…> [--fix] [--yes]` | Same diagnostics, dedicated tool. |
 | `filerouter reload` | Reloads the config (revalidation + atomic swap). |
 | `filerouter keys list` | Lists the keyring keys and their epochs. |
 
 > **v1.0 scope**: implemented commands are `validate-config`, `health`, `trace`,
-> `list-quarantine`, `reconcile` and `run`. The `status`, `replay`, `reload` and
-> `keys list` commands are described here as the target and will be added in a later
-> version (`list-quarantine` plus reading `runtime/error/<id>/error.json` covers
-> diagnosis today; replay is currently done by re-dropping the source).
+> `list-quarantine`, `reconcile`, `run` and `doctor` (plus the `filerouter-doctor`
+> tool). The `status`, `replay`, `reload` and `keys list` commands are described here
+> as the target and will be added in a later version.
+
+### 1bis. `filerouter-doctor` — diagnostics & repair
+
+Anticipates problems before production. Checks: config (schema + consistency),
+directory existence and **permissions** (`base_folders`, `exchange`, `runtime`),
+`runtime`/`exchange` on the **same volume**, crypto backend and **key presence**
+(GnuPG self-test, recipient/signing keys, authorized signers), encryption/compression
+rules referencing known aliases.
+
+- **Every problem** is listed on standard output; each problem it cannot fix comes with
+  a **clear, OS-aware solution** (`gpg --import`, `chmod`/`chown` on Linux, `icacls` on
+  Windows, same-volume move…).
+- `--fix`: offers to fix safe problems (creating directories) asking before each fix.
+- `--fix --yes`: **automatic repair** with no questions. The config is re-diagnosed
+  after repair (exit code reflects the final state).
+- The doctor never auto-fixes security-sensitive items (keys, permissions).
 
 ## 2. Common tasks
 

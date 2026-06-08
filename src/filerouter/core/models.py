@@ -67,7 +67,7 @@ class EncryptionInfo:
 
 @dataclass
 class Metadata:
-    """Metadata accompanying a routed file (see docs/04-data-formats.md)."""
+    """Metadata accompanying a routed file (see docs/fr/04-data-formats.md)."""
 
     schema_version: str
     technical_id: str
@@ -85,6 +85,8 @@ class Metadata:
     extension: str | None = None
     size_bytes: int | None = None
     encryption: EncryptionInfo | None = None
+    compressed: bool = False
+    compression: dict[str, Any] | None = None  # {"algorithm": "gzip"} when compressed
     naming: dict[str, Any] = field(default_factory=dict)
     producer: dict[str, Any] = field(default_factory=dict)
 
@@ -111,6 +113,10 @@ class Metadata:
             data["size_bytes"] = self.size_bytes
         if self.encryption is not None:
             data["encryption"] = self.encryption.to_dict()
+        if self.compressed:
+            data["compressed"] = self.compressed
+            if self.compression is not None:
+                data["compression"] = self.compression
         if self.naming:
             data["naming"] = self.naming
         if self.producer:
@@ -137,6 +143,8 @@ class Metadata:
             extension=data.get("extension"),
             size_bytes=data.get("size_bytes"),
             encryption=EncryptionInfo.from_dict(enc) if enc else None,
+            compressed=bool(data.get("compressed", False)),
+            compression=data.get("compression"),
             naming=data.get("naming", {}),
             producer=data.get("producer", {}),
         )
@@ -206,17 +214,19 @@ class VerificationResult:
     reason: str | None = None
 
 
-# Audit event vocabulary (docs/04-data-formats.md).
+# Audit event vocabulary (docs/fr/04-data-formats.md).
 AUDIT_EVENTS: frozenset[str] = frozenset(
     {
         "DETECTED",
         "HASH_COMPUTED",
+        "COMPRESSED",
         "ENCRYPTED",
         "RENAMED",
         "MOVED_TO_EXCHANGE_OUT",
         "RECEIVED_FROM_EXCHANGE_IN",
         "HASH_VALIDATED",
         "DECRYPTED",
+        "DECOMPRESSED",
         "RESTORED",
         "MOVED_TO_BUSINESS_FOLDER",
         "ARCHIVED",

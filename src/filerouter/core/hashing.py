@@ -1,6 +1,6 @@
 """SHA-256 hashing engine (streaming, constant memory).
 
-See docs/07-hashing.md. Comparison is constant-time.
+See docs/fr/07-hashing.md. Comparison is constant-time.
 """
 
 from __future__ import annotations

@@ -120,7 +120,7 @@ détecter les orphelins, les verrous périmés et les transitions interrompues, 
 relance ou les met en quarantaine. Voir [16 — Reprise après incident](16-disaster-recovery.md).
 
 ### 2.9 Modèle de config
-Charge le YAML, le valide via [`config.schema.json`](schemas/config.schema.json), résout les
+Charge le YAML, le valide via [`config.schema.json`](../schemas/config.schema.json), résout les
 chemins `base_folders` locaux à l'hôte, compile les règles d'inclusion/exclusion et de
 chiffrement. Une config invalide interrompt le démarrage (fail-fast).
 

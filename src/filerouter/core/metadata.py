@@ -1,7 +1,7 @@
 """Metadata serialization, validation and IO.
 
 Validation uses the JSON Schema bundled in the package (config/_schemas). See
-docs/04-data-formats.md.
+docs/fr/04-data-formats.md.
 """
 
 from __future__ import annotations

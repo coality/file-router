@@ -2,7 +2,7 @@
 
 Ce document définit la **convention de nommage**, la structure complète du **metadata JSON**
 et celle du **fichier d'audit JSON**. Les schémas vérifiables par machine se trouvent dans
-[`schemas/`](schemas/) et des instances de référence dans [`examples/`](examples/).
+[`schemas/`](../schemas/) et des instances de référence dans [`examples/`](../examples/).
 
 ## 1. Convention de nommage
 
@@ -58,7 +58,7 @@ PAYMENT_OUT_20260608T120000_ABC123.csv.meta.json
 ## 2. Structure du metadata JSON
 
 Le metadata est un sur-ensemble des champs minimaux requis. Schéma :
-[`schemas/metadata.schema.json`](schemas/metadata.schema.json).
+[`schemas/metadata.schema.json`](../schemas/metadata.schema.json).
 
 ```json
 {
@@ -108,7 +108,7 @@ Le metadata est un sur-ensemble des champs minimaux requis. Schéma :
 
 L'audit est en **JSON-Lines append-only** : une ligne JSON par événement, jamais réécrite.
 Fichier : `runtime/audit/<technical_id>.audit.json`. Schéma :
-[`schemas/audit.schema.json`](schemas/audit.schema.json).
+[`schemas/audit.schema.json`](../schemas/audit.schema.json).
 
 ```json
 {"technical_id":"ABC123","seq":1,"event":"DETECTED","ts":"2026-06-08T12:00:00.001Z","direction":"OUT","host":"SRV-A","actor":"OutboundProcessor","details":{"source_abspath":"D:\\interfaces\\...\\file.csv","base_folder_alias":"PAYMENT"}}
@@ -133,9 +133,13 @@ Fichier : `runtime/audit/<technical_id>.audit.json`. Schéma :
 | `details` | object | Charge spécifique à l'événement. |
 
 ### Vocabulaire d'événements (exhaustif et minimal)
-`DETECTED`, `HASH_COMPUTED`, `ENCRYPTED`, `RENAMED`, `MOVED_TO_EXCHANGE_OUT`,
-`RECEIVED_FROM_EXCHANGE_IN`, `HASH_VALIDATED`, `DECRYPTED`, `RESTORED`,
-`MOVED_TO_BUSINESS_FOLDER`, `ARCHIVED`, `ERROR`.
+`DETECTED`, `HASH_COMPUTED`, `COMPRESSED`, `ENCRYPTED`, `RENAMED`,
+`MOVED_TO_EXCHANGE_OUT`, `RECEIVED_FROM_EXCHANGE_IN`, `HASH_VALIDATED`, `DECRYPTED`,
+`DECOMPRESSED`, `RESTORED`, `MOVED_TO_BUSINESS_FOLDER`, `ARCHIVED`, `ERROR`.
+
+> `COMPRESSED` (sortant) et `DECOMPRESSED` (entrant) ne sont émis que si une règle de
+> compression s'applique. La metadata porte alors `compressed: true` et
+> `compression: { "algorithm": "gzip" }`.
 
 Un événement `ERROR` porte `details.step`, `details.exception_type`, `details.message` et
 `details.quarantine_path`. Tout `ERROR` est **terminal** pour le pipeline courant tant que

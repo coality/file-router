@@ -1,7 +1,7 @@
 """GnuPGProvider: OpenPGP backend via python-gnupg.
 
 Encrypts+signs on outbound, verifies+decrypts on inbound. See
-docs/06-encryption.md. python-gnupg is imported lazily so the rest of the
+docs/fr/06-encryption.md. python-gnupg is imported lazily so the rest of the
 package works without the gpg binary installed.
 """
 

@@ -1,4 +1,4 @@
-"""Ports (interfaces) du cœur portable — voir docs/01-architecture.md §3."""
+"""Ports (interfaces) du cœur portable — voir docs/fr/01-architecture.md §3."""
 
 from filerouter.ports.clock import Clock
 from filerouter.ports.crypto_provider import CryptoProvider
