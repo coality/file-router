@@ -36,6 +36,18 @@ class CryptoProvider(Protocol):
         """Verify the signature of ``payload_path`` without decrypting."""
         ...
 
+    def sign_detached(self, data: bytes) -> bytes:
+        """Return a DETACHED OpenPGP signature over ``data`` (e.g. the metadata).
+
+        Used to authenticate the metadata sidecar so its routing fields cannot be
+        tampered with in transit. Raises ``CryptoError`` if signing is unavailable.
+        """
+        ...
+
+    def verify_detached(self, data: bytes, signature: bytes) -> VerificationResult:
+        """Verify a detached ``signature`` over ``data`` against the trusted key."""
+        ...
+
     def list_keys(self) -> list[KeyInfo]:
         """List keys available in the keyring."""
         ...

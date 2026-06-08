@@ -12,6 +12,8 @@ file system and the `filerouter` CLI (no database).
 | `filerouter validate-config <path>` | Validates a YAML without starting. |
 | `filerouter trace <technical_id>` | Reconstructs the history (correlated audit + logs). |
 | `filerouter list-quarantine` | Lists the items in `runtime/error/`. |
+| `filerouter preview [--watched-only]` | Read-only: lists which business files are watched/skipped (rule + reason) and inbound payloads pending — moves nothing. |
+| `filerouter history [--limit N]` | Human-readable transfer journal (support): date, direction, names, flags clear/encrypted/signed/compressed, SHA-256, paths, id. |
 | `filerouter replay <technical_id>` | Replays a quarantined item. |
 | `filerouter reconcile` | Forces an immediate reconciliation. |
 | `filerouter run` | Runs the service loop in the foreground. |
@@ -21,7 +23,7 @@ file system and the `filerouter` CLI (no database).
 | `filerouter keys list` | Lists the keyring keys and their epochs. |
 
 > **v1.0 scope**: implemented commands are `validate-config`, `health`, `trace`,
-> `list-quarantine`, `reconcile`, `run` and `doctor` (plus the `filerouter-doctor`
+> `list-quarantine`, `preview`, `history`, `reconcile`, `run` and `doctor` (plus the `filerouter-doctor`
 > tool). The `status`, `replay`, `reload` and `keys list` commands are described here
 > as the target and will be added in a later version.
 

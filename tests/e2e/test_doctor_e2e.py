@@ -10,6 +10,8 @@ from __future__ import annotations
 import copy
 import os
 import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -93,7 +95,56 @@ def test_same_volume_detected_when_dirs_exist(config_dict: dict,
     assert findings["same_volume"] == OK
 
 
-@pytest.mark.skipif(os.geteuid() == 0, reason="root bypasses permission checks")
+def _running_privileged() -> bool:
+    """True for accounts that bypass DACL/permission checks (Windows admin / root).
+
+    Such accounts can read/write regardless of the DACL, so a denied directory
+    cannot be simulated for them — the test is meaningless and is skipped.
+    """
+    if sys.platform == "win32":
+        try:
+            import ctypes  # noqa: PLC0415
+
+            return bool(ctypes.windll.shell32.IsUserAnAdmin())
+        except Exception:  # noqa: BLE001
+            return False
+    return getattr(os, "geteuid", lambda: 1)() == 0
+
+
+def _deny_current_user(path: Path) -> None:
+    """Remove the current user's read+write access to ``path`` (non-privileged).
+
+    Windows: deny exactly the granular directory rights the doctor probes — list
+    directory (RD), add file (WD) and add subdirectory (AD). Crucially this does
+    NOT deny READ_CONTROL/WRITE_DAC, so the owner can still reset the ACL during
+    teardown (a coarse ``(RX,W)`` deny would lock the ACL itself). POSIX: chmod 000.
+    """
+    if sys.platform == "win32":
+        user = os.environ.get("USERNAME", "")
+        subprocess.run(["icacls", str(path), "/deny", f"{user}:(RD,WD,AD)"],
+                       check=True, capture_output=True)
+    else:
+        os.chmod(path, 0o000)
+
+
+def _restore_current_user(path: Path) -> None:
+    """Restore access so the temp tree can be cleaned up (mirror of the deny).
+
+    ``icacls /reset`` discards every explicit ACE and re-applies inheritance,
+    which reliably removes the deny ACE (no fragile name matching) so pytest can
+    delete the temp directory afterwards.
+    """
+    if sys.platform == "win32":
+        subprocess.run(["icacls", str(path), "/reset"],
+                       check=False, capture_output=True)
+    else:
+        os.chmod(path, 0o700)
+
+
+@pytest.mark.skipif(
+    _running_privileged(),
+    reason="admin/root bypass DACL checks; a denied directory cannot be simulated",
+)
 def test_permission_problems_listed_on_stdout(config_dict: dict,
                                               tmp_path: Path) -> None:
     """A directory with no rights is listed as a permission problem on output."""
@@ -101,7 +152,7 @@ def test_permission_problems_listed_on_stdout(config_dict: dict,
     for d in _all_dirs(data):
         d.mkdir(parents=True, exist_ok=True)
     locked = Path(data["base_folders"][0]["path"])
-    os.chmod(locked, 0o000)  # remove all rights
+    _deny_current_user(locked)  # remove read+write rights
     try:
         lines: list[str] = []
         Doctor(_write(tmp_path, data), out=lines.append).run(apply_fixes=False)
@@ -110,7 +161,7 @@ def test_permission_problems_listed_on_stdout(config_dict: dict,
         assert "insufficient permissions" in joined
         assert str(locked) in joined
     finally:
-        os.chmod(locked, 0o700)  # restore so tmp cleanup works
+        _restore_current_user(locked)  # restore so tmp cleanup works
 
 
 @pytest.mark.skipif(shutil.which("gpg") is None, reason="gpg not installed")

@@ -13,7 +13,7 @@
 [![Spec](https://img.shields.io/badge/spec-v1.0-blue)](docs/README.md)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-informational)](docs/en/12-deployment.md)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue)](#installation)
-[![Tests](https://img.shields.io/badge/tests-116%20passing-brightgreen)](docs/en/18-testing-strategy.md)
+[![Tests](https://img.shields.io/badge/tests-128%20passing-brightgreen)](docs/en/18-testing-strategy.md)
 [![License](https://img.shields.io/badge/license-see%20LICENSE-lightgrey)](LICENSE)
 
 ```mermaid
@@ -108,6 +108,46 @@ python -m filerouter.service.windows start
 > crée `FileRouter_siteA` (voir [docs/fr/12-deployment.md](docs/fr/12-deployment.md) et
 > l'exemple 2-sites [`docs/examples/two-instance/`](docs/examples/two-instance/README.md)).
 
+#### 📦 Bundle portable Windows (clé en main, **rien à installer**)
+
+Pour déployer sur une machine **sans Python ni GnuPG préinstallés**, le script
+[`scripts/build-portable-win.ps1`](scripts/build-portable-win.ps1) produit un
+`.zip` **100 % autonome** :
+
+- **Python embarqué** + toutes les dépendances Python + **GnuPG embarqué**
+  (`gnupg\bin\gpg.exe`) → les backends `pgpy` **et** `gnupg` marchent tels quels ;
+- la **documentation complète** (`docs\`), le `README.md`, le `LICENSE` et un
+  `VERSIONS.txt` listant les **versions exactes** de chaque dépendance (suivi CVE) ;
+- les lanceurs `filerouter.bat`, `filerouter-doctor.bat`, `filerouter-service.bat` ;
+- compatible **Windows 10/11** et **Windows Server 2016/2019/2022/2025** (x64).
+
+```powershell
+# Construire le bundle (machine de build : Python 3.12 + GnuPG requis)
+powershell -ExecutionPolicy Bypass -File scripts\build-portable-win.ps1
+#  -> dist\filerouter-<version>-win64.zip
+
+# Sur la machine cible : décompresser, créer SA config depuis le modèle, lancer
+copy config\config.example.yaml config\config.yaml      # une seule fois
+filerouter-doctor.bat --config config\config.yaml --fix --yes
+filerouter.bat        --config config\config.yaml run
+```
+
+Service Windows sous un **compte de service** (recommandé ; requis pour accéder à
+des partages **UNC**, car `LocalSystem` n'a pas d'identité réseau) :
+
+```powershell
+filerouter-service.bat install --config <…>\config.yaml ^
+    --username "DOMAINE\svc_filerouter" --password "***" --startup auto
+filerouter-service.bat start
+```
+
+**Mise à jour en place, sans rien casser ni écraser la config** : arrêter le
+service, puis re-décompresser la nouvelle archive dans le **même dossier**
+`filerouter\`. Le programme (Python, GnuPG, code) est remplacé ; votre
+`config.yaml` n'est **jamais écrasé** — l'archive ne contient que
+`config.example.yaml` (un modèle). Gardez `runtime`/`exchange`/trousseau **hors**
+du dossier du bundle (c'est déjà le cas avec la config d'exemple).
+
 #### 🩺 Diagnostic & réparation — `filerouter-doctor`
 
 `filerouter-doctor` **anticipe les problèmes** : config (schéma + cohérence), existence et
@@ -149,10 +189,11 @@ risques, versionnement, reprise, structure, tests.
 
 ### Statut
 
-Application **v1.0** — **116 tests verts** (unitaires + e2e : aller-retour, OpenPGP réel,
-compression, sécurité/falsification, concurrence, reprise, échecs IO, doctor). CLI :
-`validate-config`, `health`, `trace`, `list-quarantine`, `reconcile`, `run`, `doctor`,
-plus `filerouter-doctor`.
+Application **v1.0** — **127 tests verts** (unitaires + e2e : aller-retour, OpenPGP réel,
+compression, sécurité/falsification, concurrence, reprise, échecs IO, doctor, `preview`,
+compte de service Windows). Plus un **bundle portable Windows** et un test e2e du service
+natif. CLI : `validate-config`, `health`, `trace`, `list-quarantine`, `reconcile`,
+`preview`, `run`, `doctor`, plus `filerouter-doctor`.
 
 ### Licence
 
@@ -242,6 +283,46 @@ python -m filerouter.service.windows start
 > `FileRouter_siteA` (see [docs/en/12-deployment.md](docs/en/12-deployment.md) and the
 > two-site example [`docs/examples/two-instance/`](docs/examples/two-instance/README.md)).
 
+#### 📦 Portable Windows bundle (turnkey, **nothing to install**)
+
+To deploy on a machine **without Python or GnuPG installed**, the script
+[`scripts/build-portable-win.ps1`](scripts/build-portable-win.ps1) produces a
+**fully self-contained** `.zip`:
+
+- **embedded Python** + all Python dependencies + **embedded GnuPG**
+  (`gnupg\bin\gpg.exe`) → both the `pgpy` **and** `gnupg` backends work as-is;
+- the **full documentation** (`docs\`), `README.md`, `LICENSE`, and a
+  `VERSIONS.txt` listing the **exact versions** of every dependency (CVE tracking);
+- the `filerouter.bat`, `filerouter-doctor.bat`, `filerouter-service.bat` launchers;
+- compatible with **Windows 10/11** and **Windows Server 2016/2019/2022/2025** (x64).
+
+```powershell
+# Build the bundle (build machine needs Python 3.12 + GnuPG)
+powershell -ExecutionPolicy Bypass -File scripts\build-portable-win.ps1
+#  -> dist\filerouter-<version>-win64.zip
+
+# On the target machine: unzip, create YOUR config from the template, run
+copy config\config.example.yaml config\config.yaml      # once
+filerouter-doctor.bat --config config\config.yaml --fix --yes
+filerouter.bat        --config config\config.yaml run
+```
+
+Windows service under a dedicated **service account** (recommended; required to
+reach **UNC** shares, since `LocalSystem` has no network identity):
+
+```powershell
+filerouter-service.bat install --config <…>\config.yaml ^
+    --username "DOMAIN\svc_filerouter" --password "***" --startup auto
+filerouter-service.bat start
+```
+
+**In-place upgrade, without breaking anything or overwriting config**: stop the
+service, then re-extract the new archive into the **same** `filerouter\` folder.
+The program (Python, GnuPG, code) is replaced; your `config.yaml` is **never
+overwritten** — the archive ships only `config.example.yaml` (a template). Keep
+`runtime`/`exchange`/keyring **outside** the bundle folder (already the case with
+the example config).
+
 #### 🩺 Diagnostics & repair — `filerouter-doctor`
 
 `filerouter-doctor` **anticipates problems**: config (schema + consistency), directory
@@ -283,10 +364,12 @@ analysis, versioning, recovery, project structure, testing.
 
 ### Status
 
-**v1.0** application — **116 passing tests** (unit + e2e: round trip, real OpenPGP,
-compression, security/tamper, concurrency, recovery, IO failures, doctor). CLI:
-`validate-config`, `health`, `trace`, `list-quarantine`, `reconcile`, `run`, `doctor`,
-plus `filerouter-doctor`.
+**v1.0** application — **127 passing tests** (unit + e2e: round trip, real OpenPGP,
+compression, security/tamper, concurrency, recovery, IO failures, doctor, `preview`,
+Windows service account). Plus a **portable Windows bundle** and a native-service e2e test.
+CLI:
+`validate-config`, `health`, `trace`, `list-quarantine`, `reconcile`, `preview`, `run`,
+`doctor`, plus `filerouter-doctor`.
 
 ### License
 

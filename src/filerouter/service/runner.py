@@ -17,14 +17,38 @@ from filerouter.adapters.local_file_store import LocalFileStore
 from filerouter.adapters.noop_crypto import NoopCryptoProvider
 from filerouter.adapters.system_clock import SystemClock
 from filerouter.adapters.ulid_generator import make_id_generator
+from pathlib import Path
+
 from filerouter.config.model import Config
 from filerouter.core.audit import AuditLog
 from filerouter.core.context import Context
 from filerouter.core.dedup import DedupIndex
+from filerouter.core.journal import TransferJournal
 from filerouter.core.orchestrator import Orchestrator
 from filerouter.core.reconciliation import Reconciler
+from filerouter.core.errors import CryptoError
 from filerouter.core.state_machine import Quarantine
 from filerouter.ports.crypto_provider import CryptoProvider
+
+
+def _resolve_passphrase(enc) -> str | None:
+    """Resolve the private-key passphrase WITHOUT ever storing it in the YAML.
+
+    Order: the FILEROUTER_GPG_PASSPHRASE env var wins; otherwise read it from
+    ``passphrase_file`` (a file the operator restricts to the service account via
+    ACL/chmod). Returns None when neither is configured.
+    """
+    env = os.environ.get("FILEROUTER_GPG_PASSPHRASE")
+    if env:
+        return env
+    if enc.passphrase_file:
+        try:
+            text = Path(enc.passphrase_file).read_text(encoding="utf-8")
+        except OSError as exc:
+            raise CryptoError(
+                f"cannot read passphrase_file '{enc.passphrase_file}': {exc}") from exc
+        return text.strip() or None
+    return None
 
 
 def _build_crypto(config: Config) -> CryptoProvider:
@@ -39,13 +63,17 @@ def _build_crypto(config: Config) -> CryptoProvider:
         return GnuPGProvider(
             gnupg_home=config.encryption.gnupg_home or "",
             signing_key_id=config.encryption.signing_key_id,
-            passphrase=os.environ.get("FILEROUTER_GPG_PASSPHRASE"),
+            passphrase=_resolve_passphrase(config.encryption),
             armored=config.encryption.armored,
+            # Explicit config wins; otherwise a bundle points here via env var.
+            gpg_binary=(config.encryption.gnupg_binary
+                        or os.environ.get("FILEROUTER_GNUPG_BINARY")),
         )
     if backend == "pgpy":
         from filerouter.adapters.pgpy_provider import PGPyProvider  # lazy
 
-        return PGPyProvider(config.encryption)
+        return PGPyProvider(config.encryption,
+                            passphrase=_resolve_passphrase(config.encryption))
     return NoopCryptoProvider()
 
 
@@ -64,7 +92,8 @@ def build_context(config: Config, *, quiet: bool = False) -> Context:
     layout.ensure()  # create runtime/exchange directories if missing
     store = LocalFileStore()
     clock = SystemClock()
-    log = _build_log(config, layout.runtime_root.parent / "logs", quiet)
+    logs_dir = layout.runtime_root.parent / "logs"
+    log = _build_log(config, logs_dir, quiet)
     return Context(
         config=config,
         layout=layout,
@@ -78,6 +107,7 @@ def build_context(config: Config, *, quiet: bool = False) -> Context:
         audit=AuditLog(layout.audit, store, clock),
         dedup=DedupIndex(layout.dedup),
         quarantine=Quarantine(layout.error, store),
+        journal=TransferJournal(logs_dir / "transfers.log", clock),
         host=socket.gethostname(),
     )
 

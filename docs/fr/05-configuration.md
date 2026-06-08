@@ -139,6 +139,11 @@ exclusion:
 ```
 > L'exclusion l'emporte sur l'inclusion. Les fichiers d'échange (`*.meta.json`) sont
 > implicitement gérés et ne sont jamais traités comme des sources métier.
+>
+> Le matching glob est **insensible à la casse** et **identique sous Linux et
+> Windows** : `*.csv` matche `data.csv` comme `DATA.CSV`. Le `*` traverse les `/`,
+> donc `*.csv` couvre aussi bien la racine que les sous-répertoires. Pour ne
+> transférer que certaines extensions : `inclusion: { patterns: ["*.csv", "*.xml"] }`.
 
 ### 2.9 `archival` & `retention`
 ```yaml

@@ -64,11 +64,16 @@ def _transport_one(ctx) -> Path:
     Returns the payload path now sitting in exchange_in.
     """
     out = ctx.layout.exchange_out
-    payload = next(p for p in out.iterdir() if not p.name.endswith(".meta.json"))
+    payload = next(p for p in out.iterdir()
+                   if not (p.name.endswith(".meta.json") or p.name.endswith(".sig")))
     meta = payload.with_name(payload.name + ".meta.json")
     dst = ctx.layout.exchange_in / payload.name
     payload.replace(dst)
     meta.replace(ctx.layout.exchange_in / meta.name)
+    # a real transport also carries the detached metadata signature, if any
+    sig = meta.with_name(meta.name + ".sig")
+    if sig.exists():
+        sig.replace(ctx.layout.exchange_in / sig.name)
     return dst
 
 

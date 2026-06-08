@@ -78,12 +78,12 @@ class Orchestrator:
         return f"{rel_dir}/{path.name}" if rel_dir else path.name
 
     def collect_inbound(self) -> list[Path]:
-        """List payload files in exchange_in (metadata sidecars excluded)."""
+        """List payload files in exchange_in (metadata + signature sidecars excluded)."""
         suffix = self._ctx.config.naming.meta_suffix
         return [
             p for p in self._ctx.store.iter_files(self._ctx.layout.exchange_in,
                                                   recursive=False)
-            if not p.name.endswith(suffix)
+            if not (p.name.endswith(suffix) or p.name.endswith(suffix + ".sig"))
         ]
 
     def _is_stable(self, path: Path) -> bool:

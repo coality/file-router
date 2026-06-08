@@ -43,6 +43,23 @@ def test_invalid_backend_rejected(config_dict: dict) -> None:
         load_config_dict(data)
 
 
+def test_gnupg_binary_path_is_parsed(config_dict: dict) -> None:
+    """An explicit gpg binary path is accepted and exposed on the config.
+
+    This lets a self-contained bundle ship and use its own gpg(.exe).
+    """
+    data = copy.deepcopy(config_dict)
+    data["encryption"]["backend"] = "gnupg"
+    data["encryption"]["gnupg_binary"] = r"C:\bundle\gnupg\bin\gpg.exe"
+    cfg = load_config_dict(data)
+    assert cfg.encryption.gnupg_binary == r"C:\bundle\gnupg\bin\gpg.exe"
+
+
+def test_gnupg_binary_defaults_to_none(config_dict: dict) -> None:
+    """Without an explicit path, gnupg_binary is None (gpg looked up on PATH)."""
+    assert load_config_dict(config_dict).encryption.gnupg_binary is None
+
+
 def test_missing_required_section_rejected(config_dict: dict) -> None:
     """Removing a required section fails schema validation."""
     data = copy.deepcopy(config_dict)

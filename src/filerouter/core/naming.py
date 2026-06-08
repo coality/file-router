@@ -86,6 +86,11 @@ def meta_name(technical_filename: str, cfg: NamingConfig) -> str:
     return technical_filename + cfg.meta_suffix
 
 
+def meta_sig_name(technical_filename: str, cfg: NamingConfig) -> str:
+    """Return the detached-signature sidecar name for the metadata file."""
+    return meta_name(technical_filename, cfg) + ".sig"
+
+
 def _assert_portable(name: str) -> None:
     if _PORTABLE_RE.search(name):
         raise DataError(f"technical name contains non-portable characters: {name!r}")

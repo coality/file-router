@@ -53,6 +53,16 @@ def _validate_minimal(data: dict[str, Any]) -> None:
         raise DataError(f"metadata missing required fields: {missing}")
     if data.get("encrypted") and "encryption" not in data:
         raise DataError("encrypted metadata must include 'encryption'")
+    # Security: technical_id is used to build filesystem paths; reject anything
+    # that is not a safe single component (no separators, no '..') even on the
+    # fallback path where jsonschema is unavailable. Mirrors the schema pattern.
+    import re  # noqa: PLC0415
+
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", str(data.get("technical_id", ""))):
+        raise DataError("technical_id contains illegal characters")
+    rel = str(data.get("relative_path", ""))
+    if rel.startswith("/") or "\\" in rel or ".." in rel.split("/"):
+        raise DataError("relative_path is not a safe relative POSIX path")
 
 
 def dumps(meta: Metadata) -> bytes:

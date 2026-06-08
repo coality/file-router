@@ -16,7 +16,7 @@ from filerouter.core import compression, hashing, metadata as meta_mod, naming
 from filerouter.core.context import Context
 from filerouter.core.errors import FileRouterError
 from filerouter.core.models import Direction, EncryptionInfo, FileHash, Metadata
-from filerouter.core.pathing import identify_base_folder, relative_path
+from filerouter.core.pathing import business_target, identify_base_folder, relative_path
 from filerouter.version import METADATA_SCHEMA_VERSION
 
 
@@ -176,6 +176,12 @@ class OutboundProcessor:
             self._copy(staged, payload)
             return payload, None
         recipients = list(rule.recipient_key_ids)
+        if not recipients:
+            # File-based backends (pgpy) encrypt to a configured key, not key ids;
+            # record that key's id so the metadata carries a real recipient.
+            provider_recipients = getattr(self._ctx.crypto, "recipient_ids", None)
+            if provider_recipients is not None:
+                recipients = list(provider_recipients())
         signing = self._ctx.config.encryption.signing_key_id
         self._ctx.crypto.encrypt(staged, payload, recipients, signing)
         enc = EncryptionInfo(
@@ -243,13 +249,43 @@ class OutboundProcessor:
         metadata file pointing at a missing payload.
         """
         out = self._ctx.layout.exchange_out
-        meta_name = naming.meta_name(technical_name, self._ctx.config.naming)
+        cfg = self._ctx.config.naming
+        meta_name = naming.meta_name(technical_name, cfg)
+        meta_bytes = meta_mod.dumps(meta)
+        # Order: payload, then (optional) detached metadata signature, then the
+        # metadata LAST. The metadata file is the commit marker the receiver waits
+        # on, so by the time it appears the signature is already present.
         self._ctx.store.atomic_move(payload, out / technical_name)
-        self._ctx.store.atomic_write_bytes(out / meta_name, meta_mod.dumps(meta))
+        if meta.encryption is not None and meta.encryption.signed:
+            sig = self._ctx.crypto.sign_detached(meta_bytes)
+            self._ctx.store.atomic_write_bytes(
+                out / naming.meta_sig_name(technical_name, cfg), sig)
+        self._ctx.store.atomic_write_bytes(out / meta_name, meta_bytes)
         self._audit(technical_id, "MOVED_TO_EXCHANGE_OUT", Direction.OUT,
                     {"path": str(out / technical_name)})
         self._log("functional", "INFO", "ROUTED_OUT", technical_id,
                   base_folder_alias=meta.base_folder_alias)
+        self._journal_out(meta, technical_name, technical_id)
+
+    def _journal_out(self, meta: Metadata, technical_name: str,
+                     technical_id: str) -> None:
+        """Append a support-friendly line to the human-readable transfer log."""
+        enc = meta.encryption
+        base = self._ctx.config.base_folder_by_alias(meta.base_folder_alias)
+        source = (str(business_target(base.path, meta.relative_path,
+                                      meta.original_filename))
+                  if base else meta.original_filename)
+        self._ctx.journal.outbound(
+            technical_id=technical_id, alias=meta.base_folder_alias,
+            relative_path=meta.relative_path, original_filename=meta.original_filename,
+            technical_filename=technical_name, source_site=meta.source_site,
+            target_site=meta.target_site, source_path=source,
+            encrypted=meta.encrypted,
+            signed=bool(enc and enc.signed),
+            compressed=meta.compressed,
+            compression_algo=(meta.compression or {}).get("algorithm"),
+            signer_key_id=(enc.signing_key_id if (enc and enc.signed) else None),
+            clear_sha256=meta.clear_file_hash.value)
 
     def _finalize_source(self, clear: Path, technical_id: str, original: str) -> None:
         """Archive or delete the source now that publish is confirmed."""

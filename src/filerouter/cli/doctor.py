@@ -114,11 +114,62 @@ def _permission_hint(path: Path) -> str:
 
 
 def _missing_rights(path: Path, *, need_write: bool) -> list[str]:
-    """Return the list of missing access rights (read/write) for ``path``."""
+    """Return the list of missing access rights (read/write) for ``path``.
+
+    On Windows ``os.access`` ignores ACLs (it only reflects the read-only
+    attribute) and would silently pass every directory, giving a false sense of
+    security. There we use a non-mutating handle probe instead; everywhere else
+    ``os.access`` is reliable. The doctor only ever *reports* what it finds — it
+    never alters any directory's rights.
+    """
+    if _is_windows():
+        win = _missing_rights_windows(path, need_write=need_write)
+        if win is not None:
+            return win
     missing: list[str] = []
     if not os.access(path, os.R_OK):
         missing.append("read")
     if need_write and not os.access(path, os.W_OK):
+        missing.append("write")
+    return missing
+
+
+def _missing_rights_windows(path: Path, *, need_write: bool) -> list[str] | None:
+    """ACL-accurate, non-mutating rights probe on Windows (None if no pywin32).
+
+    Opens a *directory handle* (FILE_FLAG_BACKUP_SEMANTICS) requesting the rights
+    we care about: list-directory (read) and add-file/add-subdirectory (write).
+    The kernel evaluates the DACL and denies the open when a right is missing.
+    Nothing is read, created or modified — only a handle is opened and closed —
+    so this is safe to run against live production directories.
+    """
+    try:
+        import pywintypes  # noqa: PLC0415
+        import win32con  # noqa: PLC0415
+        import win32file  # noqa: PLC0415
+    except ImportError:
+        return None  # pywin32 not installed: caller falls back to os.access
+
+    file_list_directory = 0x0001
+    file_add_file = 0x0002
+    file_add_subdirectory = 0x0004
+    share = (win32con.FILE_SHARE_READ | win32con.FILE_SHARE_WRITE
+             | win32con.FILE_SHARE_DELETE)
+
+    def can(access: int) -> bool:
+        try:
+            handle = win32file.CreateFile(
+                str(path), access, share, None, win32con.OPEN_EXISTING,
+                win32con.FILE_FLAG_BACKUP_SEMANTICS, None)
+        except pywintypes.error:
+            return False
+        handle.Close()
+        return True
+
+    missing: list[str] = []
+    if not can(file_list_directory):
+        missing.append("read")
+    if need_write and not can(file_add_file | file_add_subdirectory):
         missing.append("write")
     return missing
 

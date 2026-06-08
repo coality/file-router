@@ -44,6 +44,36 @@ def instance_from_service_name(name: str) -> str | None:
     return name[len(prefix):] if name.startswith(prefix) else None
 
 
+def build_command_line_argv(
+    action: str,
+    *,
+    username: str | None = None,
+    password: str | None = None,
+    startup: str | None = None,
+) -> list[str]:
+    """Assemble the argv handed to ``win32serviceutil.HandleCommandLine``.
+
+    The service-account credentials (``--username``/``--password``) and the
+    ``--startup`` type only make sense when (un)installing, so they are attached
+    for ``install``/``update`` and ignored for ``start``/``stop``/``remove``.
+
+    A domain service account is given as ``DOMAIN\\user`` (or ``user@domain``);
+    a local account as ``.\\user``. The account must hold the "Log on as a
+    service" right. Running under a real account (rather than LocalSystem) is
+    what lets the service reach UNC shares with a network identity.
+    """
+    argv = ["filerouter-windows-service"]
+    if action in ("install", "update"):
+        if startup:
+            argv += ["--startup", startup]
+        if username:
+            argv += ["--username", username]
+        if password is not None:
+            argv += ["--password", password]
+    argv.append(action)
+    return argv
+
+
 def resolve_config_path(name: str, environ: Mapping[str, str]) -> str:
     """Resolve the config path for a running service from its name and the env.
 
@@ -111,6 +141,16 @@ def build_service_class():
     return FileRouterService
 
 
+# Build the service class AT IMPORT so the SCM host process (pythonservice.exe)
+# can resolve it by name (``filerouter.service.windows.FileRouterService``) when
+# it starts the service. Guarded: on hosts without pywin32 (e.g. Linux) this
+# stays None and the module still imports for the pure, OS-independent helpers.
+try:
+    FileRouterService = build_service_class()
+except ImportError:
+    FileRouterService = None
+
+
 def _persist_config_env(instance: str | None, config_path: str) -> None:
     """Persist the per-instance config path as a machine environment variable.
 
@@ -146,6 +186,14 @@ def main(argv: list[str] | None = None) -> int:
                         help="instance name (enables multiple services on one host)")
     parser.add_argument("--config", default=None,
                         help="config path to persist for this instance on install")
+    parser.add_argument("--username", default=None,
+                        help="service logon account (e.g. DOMAIN\\svc_filerouter); "
+                             "required for UNC network access")
+    parser.add_argument("--password", default=None,
+                        help="password for --username (service logon account)")
+    parser.add_argument("--startup", default=None,
+                        choices=["auto", "delayed", "manual", "disabled"],
+                        help="service start type on install/update (default: manual)")
     args = parser.parse_args(argv)
 
     name = service_name(args.instance)
@@ -155,12 +203,21 @@ def main(argv: list[str] | None = None) -> int:
     if args.action in ("install", "update") and args.config:
         _persist_config_env(args.instance, args.config)
 
+    if FileRouterService is None:
+        raise RuntimeError(
+            "pywin32 is required for the Windows service (pip install '.[windows]')")
+
     import win32serviceutil  # noqa: PLC0415 - Windows only
 
-    cls = build_service_class()
+    # The service name/display for THIS instance live on the class; HandleCommandLine
+    # reads them (it has no serviceName kwarg). The running service still derives its
+    # own config from the name the SCM starts it under (see __init__/SvcDoRun).
+    FileRouterService._svc_name_ = name
+    FileRouterService._svc_display_name_ = display
     win32serviceutil.HandleCommandLine(
-        cls, serviceName=name, serviceDisplayName=display,
-        argv=["filerouter-windows-service", args.action])
+        FileRouterService,
+        argv=build_command_line_argv(args.action, username=args.username,
+                                     password=args.password, startup=args.startup))
     return 0
 
 

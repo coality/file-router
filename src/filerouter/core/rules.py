@@ -7,21 +7,30 @@ path_pattern). See docs/fr/05-configuration.md.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from fnmatch import fnmatch
+from fnmatch import fnmatchcase
 from pathlib import PurePosixPath
 
 
 def _match(pattern: str, rel_posix: str) -> bool:
-    """Glob-match a POSIX relative path against a pattern.
+    """Glob-match a POSIX relative path against a pattern (CASE-INSENSITIVE).
+
+    Matching is deliberately case-insensitive AND OS-independent. ``fnmatch``
+    folds case on Windows but not on Linux, which would make FileRouter behave
+    differently per host (e.g. ``*.csv`` matching ``DATA.CSV`` on Windows only).
+    We normalize both sides to lower case and use ``fnmatchcase`` so the result
+    is the SAME everywhere: ``*.csv`` matches ``data.csv`` and ``DATA.CSV`` on
+    Linux and Windows alike.
 
     Supports a trailing ``**`` meaning "this directory and anything below".
     """
-    if pattern in ("**", "**/*"):
+    pat = pattern.lower()
+    rel = rel_posix.lower()
+    if pat in ("**", "**/*"):
         return True
-    if pattern.endswith("/**"):
-        prefix = pattern[:-3]
-        return rel_posix == prefix or rel_posix.startswith(prefix + "/")
-    return fnmatch(rel_posix, pattern)
+    if pat.endswith("/**"):
+        prefix = pat[:-3]
+        return rel == prefix or rel.startswith(prefix + "/")
+    return fnmatchcase(rel, pat)
 
 
 @dataclass(frozen=True)
@@ -63,6 +72,19 @@ class RuleSet:
         if any(_match(p, rel_file_posix) for p in self._exclusion):
             return False
         return any(_match(p, rel_file_posix) for p in self._inclusion)
+
+    def eligibility(self, rel_file_posix: str) -> tuple[bool, str]:
+        """Like ``is_eligible`` but also return WHY (for the ``preview`` command).
+
+        Returns ``(eligible, reason)``. Exclusion wins, so it is checked first.
+        """
+        for pattern in self._exclusion:
+            if _match(pattern, rel_file_posix):
+                return False, f"excluded by '{pattern}'"
+        for pattern in self._inclusion:
+            if _match(pattern, rel_file_posix):
+                return True, f"included by '{pattern}'"
+        return False, "no inclusion pattern matched"
 
     def encryption_for(
         self, base_folder_alias: str, rel_file_posix: str

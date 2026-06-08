@@ -8,6 +8,7 @@ file stability and file age (see ``InboundReadiness``).
 
 from __future__ import annotations
 
+import json
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -45,26 +46,51 @@ class InboundReadiness:
         """Return the metadata sidecar path for a payload in exchange_in."""
         return payload.with_name(payload.name + self._ctx.config.naming.meta_suffix)
 
+    def sig_path_for(self, payload: Path) -> Path:
+        """Return the metadata-signature sidecar path for a payload."""
+        return self.meta_path_for(payload).with_name(
+            self.meta_path_for(payload).name + ".sig")
+
     def is_meta(self, path: Path) -> bool:
-        """Return True if ``path`` is a metadata sidecar (not a payload)."""
-        return path.name.endswith(self._ctx.config.naming.meta_suffix)
+        """Return True if ``path`` is a metadata or signature sidecar (not a payload)."""
+        suffix = self._ctx.config.naming.meta_suffix
+        return path.name.endswith(suffix) or path.name.endswith(suffix + ".sig")
 
     def state(self, payload: Path) -> str:
-        """Classify a payload: 'ready' | 'wait' | 'incomplete'."""
-        meta = self.meta_path_for(payload)
-        if self._ctx.store.exists(meta):
-            return "ready" if self._both_stable(payload, meta) else "wait"
-        # Metadata not here yet: tolerate until the grace period elapses.
-        if self._age_seconds(payload) < self._ctx.config.scanning.pair_grace_period_seconds:
-            return "wait"
-        return "incomplete"
+        """Classify a payload: 'ready' | 'wait' | 'incomplete'.
 
-    def _both_stable(self, payload: Path, meta: Path) -> bool:
-        """Return True only if neither file is still being written."""
+        When the metadata itself declares the payload was SIGNED, the detached
+        metadata-signature sidecar is part of the expected set — so a reordered
+        transport (meta before sig) does not trigger a premature quarantine. An
+        UNSIGNED sender (meta says not signed) is not made to wait for a sig that
+        will never arrive; the pipeline then decides per require_signature_inbound.
+        """
+        meta = self.meta_path_for(payload)
+        grace = self._ctx.config.scanning.pair_grace_period_seconds
+        if not self._ctx.store.exists(meta):
+            return "wait" if self._age_seconds(payload) < grace else "incomplete"
+        expected = [payload, meta]
+        if self._meta_says_signed(meta):
+            sig = self.sig_path_for(payload)
+            if not self._ctx.store.exists(sig):
+                return "wait" if self._age_seconds(payload) < grace else "incomplete"
+            expected.append(sig)
+        return "ready" if self._all_stable(expected) else "wait"
+
+    def _meta_says_signed(self, meta: Path) -> bool:
+        """Best-effort peek at whether the sender signed (drives sig expectation)."""
+        try:
+            data = json.loads(self._ctx.store.read_text(meta))
+        except Exception:  # noqa: BLE001 - unparseable meta: let the pipeline handle it
+            return False
+        enc = data.get("encryption")
+        return bool(enc and enc.get("signed"))
+
+    def _all_stable(self, paths: list[Path]) -> bool:
+        """Return True only if none of ``paths`` is still being written."""
         checks = self._ctx.config.scanning.stability_checks
         interval = self._ctx.config.scanning.stability_interval_seconds
-        return self._ctx.store.is_stable(payload, checks, interval) and \
-            self._ctx.store.is_stable(meta, checks, interval)
+        return all(self._ctx.store.is_stable(p, checks, interval) for p in paths)
 
     def _age_seconds(self, path: Path) -> float:
         """Age of a file in seconds, based on its mtime."""
@@ -116,6 +142,7 @@ class InboundProcessor:
 
         work = self._move_pair_in(payload, meta_path, technical_id, meta)
         self._verify_payload_hash(work.payload, meta, technical_id)
+        self._verify_metadata_signature(work, meta, technical_id)
         staged = self._decrypt_or_passthrough(work.payload, work.dir, meta, technical_id)
         clear = self._maybe_decompress(staged, work.dir, meta, technical_id)
         self._verify_clear_hash(clear, meta, technical_id)
@@ -134,9 +161,42 @@ class InboundProcessor:
         dst_meta = work_dir / "metadata.json"
         self._ctx.store.atomic_move(payload, dst_payload)
         self._ctx.store.atomic_move(meta_path, dst_meta)
+        # Move the detached metadata signature too, when present.
+        sig_src = self._readiness.sig_path_for(payload)
+        dst_sig: Path | None = None
+        if self._ctx.store.exists(sig_src):
+            dst_sig = work_dir / "metadata.json.sig"
+            self._ctx.store.atomic_move(sig_src, dst_sig)
         self._audit(technical_id, "RECEIVED_FROM_EXCHANGE_IN", meta,
                     {"technical_filename": meta.technical_filename})
-        return _Work(work_dir, dst_payload, dst_meta)
+        return _Work(work_dir, dst_payload, dst_meta, dst_sig)
+
+    def _verify_metadata_signature(self, work: "_Work", meta: Metadata,
+                                   technical_id: str) -> None:
+        """Authenticate the metadata sidecar via its detached signature.
+
+        This binds the ROUTING fields (relative_path, original_filename, alias,
+        hashes...) to the trusted signer, so a tampering party on exchange_in
+        cannot redirect a validly-signed payload. Enforced when signatures are
+        required; if a signature is present it is always checked.
+        """
+        enc = self._ctx.config.encryption
+        if work.sig is None or not self._ctx.store.exists(work.sig):
+            if enc.require_signature_inbound:
+                raise CryptoError("metadata signature missing")
+            return
+        meta_bytes = self._ctx.store.read_bytes(work.meta)
+        result = self._ctx.crypto.verify_detached(
+            meta_bytes, self._ctx.store.read_bytes(work.sig))
+        if not result.valid:
+            raise CryptoError(f"invalid metadata signature: {result.reason}")
+        if enc.allowed_signers and not _signer_allowed(result.signer_key_id,
+                                                        enc.allowed_signers):
+            raise CryptoError(
+                f"metadata signer not authorized: {result.signer_key_id}")
+        self._audit(technical_id, "HASH_VALIDATED", meta,
+                    {"target": "metadata_signature",
+                     "signer_key_id": result.signer_key_id})
 
     def _verify_payload_hash(self, payload: Path, meta: Metadata,
                              technical_id: str) -> None:
@@ -211,6 +271,18 @@ class InboundProcessor:
                     {"path": str(target)})
         self._log("functional", "INFO", "DELIVERED_IN", technical_id,
                   base_folder_alias=meta.base_folder_alias)
+        enc = meta.encryption
+        self._ctx.journal.inbound(
+            technical_id=technical_id, alias=meta.base_folder_alias,
+            relative_path=meta.relative_path, original_filename=meta.original_filename,
+            technical_filename=meta.technical_filename or "", source_site=meta.source_site,
+            target_site=meta.target_site, target_path=str(target),
+            encrypted=meta.encrypted,
+            signed=bool(enc and enc.signed),
+            compressed=meta.compressed,
+            compression_algo=(meta.compression or {}).get("algorithm"),
+            signer_key_id=(enc.signing_key_id if (enc and enc.signed) else None),
+            clear_sha256=meta.clear_file_hash.value)
 
     # -- duplicate / failure paths --------------------------------------
 
@@ -230,7 +302,8 @@ class InboundProcessor:
                  "message": str(exc)}
         artifacts = _existing([
             work_dir / "payload", work_dir / "clear", work_dir / "metadata.json",
-            payload, meta_path,
+            work_dir / "metadata.json.sig", payload, meta_path,
+            self._readiness.sig_path_for(payload),
         ])
         qdir = self._ctx.quarantine.capture(technical_id, artifacts, error)
         self._audit_id(technical_id, "ERROR", error | {"quarantine_path": str(qdir)})
@@ -295,6 +368,7 @@ class _Work:
     dir: Path
     payload: Path
     meta: Path
+    sig: Path | None = None
 
 
 def _signer_allowed(signer_key_id: str | None, allowed: tuple[str, ...]) -> bool:

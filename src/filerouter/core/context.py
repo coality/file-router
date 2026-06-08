@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from filerouter.config.model import Config
 from filerouter.core.audit import AuditLog
 from filerouter.core.dedup import DedupIndex
+from filerouter.core.journal import TransferJournal
 from filerouter.core.layout import RuntimeLayout
 from filerouter.core.state_machine import Quarantine
 from filerouter.ports.clock import Clock
@@ -36,4 +37,5 @@ class Context:
     audit: AuditLog
     dedup: DedupIndex
     quarantine: Quarantine
+    journal: TransferJournal
     host: str

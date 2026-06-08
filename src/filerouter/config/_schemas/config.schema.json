@@ -83,6 +83,10 @@
       "properties": {
         "backend": { "type": "string", "enum": ["gnupg", "pgpy", "noop"] },
         "gnupg_home": { "type": "string" },
+        "gnupg_binary": { "type": "string" },
+        "private_key_file": { "type": "string" },
+        "public_key_file": { "type": "string" },
+        "passphrase_file": { "type": "string" },
         "signing_key_id": { "type": "string" },
         "require_signature_inbound": { "type": "boolean" },
         "armored": { "type": "boolean" },

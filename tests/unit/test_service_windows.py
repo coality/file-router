@@ -9,6 +9,7 @@ from __future__ import annotations
 import pytest
 
 from filerouter.service.windows import (
+    build_command_line_argv,
     config_env_var,
     instance_from_service_name,
     resolve_config_path,
@@ -58,3 +59,36 @@ def test_resolve_raises_when_unset() -> None:
     """A clear error is raised when no config variable is set."""
     with pytest.raises(RuntimeError):
         resolve_config_path("FileRouter_siteA", {})
+
+
+def test_command_line_argv_plain_install() -> None:
+    """Without credentials, install argv is just the program and the action."""
+    assert build_command_line_argv("install") == [
+        "filerouter-windows-service", "install"]
+
+
+def test_command_line_argv_with_service_account() -> None:
+    """Service-account credentials and startup are forwarded for install."""
+    argv = build_command_line_argv(
+        "install", username="DOMAIN\\svc_fr", password="s3cret", startup="auto")
+    assert argv == [
+        "filerouter-windows-service",
+        "--startup", "auto",
+        "--username", "DOMAIN\\svc_fr",
+        "--password", "s3cret",
+        "install",
+    ]
+
+
+def test_command_line_argv_empty_password_is_forwarded() -> None:
+    """An explicit empty password (account with no password) is still passed."""
+    argv = build_command_line_argv("install", username="LOCAL\\svc", password="")
+    assert "--password" in argv and argv[argv.index("--password") + 1] == ""
+
+
+def test_command_line_argv_ignores_credentials_for_non_install() -> None:
+    """Credentials/startup are meaningless for start/stop/remove and dropped."""
+    for action in ("start", "stop", "remove", "restart"):
+        assert build_command_line_argv(
+            action, username="DOMAIN\\svc", password="x", startup="auto") == [
+            "filerouter-windows-service", action]

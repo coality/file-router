@@ -12,6 +12,8 @@ système de fichiers et la CLI `filerouter` (aucune base de données).
 | `filerouter validate-config <path>` | Valide un YAML sans démarrer. |
 | `filerouter trace <technical_id>` | Reconstruit l'historique (audit + logs corrélés). |
 | `filerouter list-quarantine` | Liste les items en `runtime/error/`. |
+| `filerouter preview [--watched-only]` | Lecture seule : liste les fichiers surveillés/ignorés (règle + raison) + paires entrantes en attente ; ne déplace rien. |
+| `filerouter history [--limit N]` | Journal de transferts lisible (support) : date, sens, noms, flags clair/chiffré/signé/compressé, SHA-256, chemins, id. |
 | `filerouter replay <technical_id>` | Rejoue un item en quarantaine. |
 | `filerouter reconcile` | Force une réconciliation immédiate. |
 | `filerouter run` | Lance la boucle de service au premier plan. |
@@ -21,7 +23,7 @@ système de fichiers et la CLI `filerouter` (aucune base de données).
 | `filerouter keys list` | Liste les clés du trousseau et leurs epochs. |
 
 > **Périmètre v1.0** : sont implémentées `validate-config`, `health`, `trace`,
-> `list-quarantine`, `reconcile`, `run` et `doctor` (+ l'outil `filerouter-doctor`).
+> `list-quarantine`, `preview`, `history`, `reconcile`, `run` et `doctor` (+ l'outil `filerouter-doctor`).
 > Les commandes `status`, `replay`, `reload` et `keys list` sont décrites ici comme
 > cible et seront ajoutées dans une version ultérieure.
 

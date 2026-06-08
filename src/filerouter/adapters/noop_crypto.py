@@ -10,6 +10,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
+from filerouter.core.errors import CryptoError
 from filerouter.core.models import KeyInfo, VerificationResult
 
 
@@ -30,6 +31,14 @@ class NoopCryptoProvider:
         return VerificationResult(valid=False, reason="no-encryption")
 
     def verify(self, payload_path: Path) -> VerificationResult:
+        return VerificationResult(valid=False, reason="no-encryption")
+
+    def sign_detached(self, data: bytes) -> bytes:
+        # The no-op backend never signs; metadata signing is only invoked when a
+        # real backend has signed the payload, so this should never be reached.
+        raise CryptoError("noop backend cannot sign metadata")
+
+    def verify_detached(self, data: bytes, signature: bytes) -> VerificationResult:
         return VerificationResult(valid=False, reason="no-encryption")
 
     def list_keys(self) -> list[KeyInfo]:

@@ -33,6 +33,37 @@ def test_office_temp_excluded() -> None:
     assert rs.is_eligible("docs/~$report.docx") is False
 
 
+def test_extension_filter_only_csv_and_xml() -> None:
+    """Inclusion can restrict transfer to specific extensions only."""
+    rs = _ruleset(inclusion=["*.csv", "*.xml"])
+    assert rs.is_eligible("clients/2026/data.csv") is True
+    assert rs.is_eligible("export.xml") is True            # at the root, too
+    assert rs.is_eligible("clients/notes.txt") is False
+    assert rs.is_eligible("archive.zip") is False
+
+
+def test_extension_matching_is_case_insensitive_both_os() -> None:
+    """`*.csv` matches .csv AND .CSV identically on Linux and Windows.
+
+    Matching is normalized (case-insensitive) so behaviour does not depend on the
+    host OS's fnmatch case folding.
+    """
+    rs = _ruleset(inclusion=["*.csv", "*.xml"])
+    for name in ("data.csv", "DATA.CSV", "Data.Csv", "report.XML", "report.xml"):
+        assert rs.is_eligible(f"some/dir/{name}") is True, name
+    # An uppercase pattern matches lowercase files just the same.
+    rs_upper = _ruleset(inclusion=["*.CSV"])
+    assert rs_upper.is_eligible("a/b/data.csv") is True
+    assert rs_upper.is_eligible("a/b/data.CSV") is True
+
+
+def test_case_insensitive_exclusion() -> None:
+    """Exclusion is case-insensitive and OS-independent as well."""
+    rs = _ruleset(exclusion=["**/*.tmp"])
+    assert rs.is_eligible("a/b/WORK.TMP") is False
+    assert rs.is_eligible("a/b/work.Tmp") is False
+
+
 def test_encryption_rule_matches_directory_glob() -> None:
     """A confidential/** rule matches files under that directory at any depth."""
     rule = EncryptionRule("PAYMENT", "confidential/**", True, ("0xKEY",))

@@ -23,12 +23,18 @@ class GnuPGProvider:
         signing_key_id: str | None = None,
         passphrase: str | None = None,
         armored: bool = False,
+        gpg_binary: str | None = None,
     ) -> None:
         try:
             import gnupg  # noqa: PLC0415 - lazy import (optional dependency)
         except ImportError as exc:  # pragma: no cover
             raise CryptoError("python-gnupg is not installed") from exc
-        self._gpg = gnupg.GPG(gnupghome=gnupg_home)
+        # gpg_binary lets a self-contained bundle ship its own gpg(.exe); when
+        # None, python-gnupg looks the binary up on PATH (the usual Linux case).
+        kwargs: dict[str, Any] = {"gnupghome": gnupg_home}
+        if gpg_binary:
+            kwargs["gpgbinary"] = gpg_binary
+        self._gpg = gnupg.GPG(**kwargs)
         self._signing_key_id = signing_key_id
         self._passphrase = passphrase
         self._armored = armored
@@ -71,6 +77,29 @@ class GnuPGProvider:
     def verify(self, payload_path: Path) -> VerificationResult:
         with open(payload_path, "rb") as fh:
             result = self._gpg.verify_file(fh)
+        return self._verification_from(result)
+
+    def sign_detached(self, data: bytes) -> bytes:
+        """Detached signature over ``data`` (the metadata bytes)."""
+        signed = self._gpg.sign(
+            data, keyid=self._signing_key_id, detach=True,
+            passphrase=self._passphrase, binary=not self._armored)
+        if not getattr(signed, "data", b""):
+            raise CryptoError(f"metadata signing failed: {getattr(signed, 'status', '?')}")
+        return bytes(signed.data)
+
+    def verify_detached(self, data: bytes, signature: bytes) -> VerificationResult:
+        """Verify a detached ``signature`` over ``data`` using the keyring."""
+        import os  # noqa: PLC0415
+        import tempfile  # noqa: PLC0415
+
+        fd, sig_path = tempfile.mkstemp(suffix=".sig")
+        try:
+            with os.fdopen(fd, "wb") as fh:
+                fh.write(signature)
+            result = self._gpg.verify_data(sig_path, data)
+        finally:
+            os.unlink(sig_path)
         return self._verification_from(result)
 
     @staticmethod

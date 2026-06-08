@@ -166,9 +166,24 @@ encryption:
   backend: gnupg
 
   # gnupg_home: keyring dedicated to FileRouter (keys imported by operations).
+  # (gnupg backend only.)
   gnupg_home: D:\FileRouter\keys\gnupg
 
+  # --- pgpy backend: file-based keys (PATHS ONLY, no key material in this YAML) ---
+  # Use these three keys instead of a keyring when backend: pgpy. Restrict the
+  # private key and passphrase files to the SERVICE ACCOUNT via NTFS ACL/chmod.
+  #   private_key_file: signs outbound + decrypts inbound
+  #   public_key_file : encrypts to the peer + verifies the peer signature inbound
+  #   passphrase_file : unlocks the private key (optional; env
+  #                     FILEROUTER_GPG_PASSPHRASE wins if set). The secret is the
+  #                     file CONTENT; this YAML only holds the path.
+  # private_key_file: C:\ProgramData\FileRouter\keys\svc.priv.asc
+  # public_key_file:  C:\ProgramData\FileRouter\keys\peer.pub.asc
+  # passphrase_file:  C:\ProgramData\FileRouter\secrets\gpg.pass
+
   # signing_key_id: private key used to SIGN outbound files.
+  # gnupg: the key id in the keyring. pgpy: any non-empty value ENABLES signing
+  # (the key used is private_key_file); recorded in metadata/journal.
   signing_key_id: "0xCAFEBABE"
 
   # require_signature_inbound: on the way in, REQUIRE a valid signature.
@@ -202,6 +217,14 @@ encryption:
 # -----------------------------------------------------------------------------
 # inclusion / exclusion — which files are ELIGIBLE (globs on the relative path).
 # EXCLUSION WINS over inclusion.
+#
+# Matching is CASE-INSENSITIVE and identical on Linux and Windows: "*.csv"
+# matches data.csv AND DATA.CSV everywhere. The "*" crosses "/", so "*.csv"
+# matches a file at the root as well as deep under sub-directories.
+#
+# To transfer ONLY certain extensions, replace the default below, e.g.:
+#   inclusion:
+#     patterns: ["*.csv", "*.xml"]   # case-insensitive: also .CSV / .XML
 # -----------------------------------------------------------------------------
 inclusion:
   patterns:

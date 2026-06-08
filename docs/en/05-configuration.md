@@ -139,6 +139,11 @@ exclusion:
 ```
 > Exclusion takes precedence over inclusion. The exchange files (`*.meta.json`) are
 > handled implicitly and are never treated as business sources.
+>
+> Glob matching is **case-insensitive** and **identical on Linux and Windows**:
+> `*.csv` matches both `data.csv` and `DATA.CSV`. The `*` crosses `/`, so `*.csv`
+> covers the root as well as sub-directories. To transfer only certain extensions:
+> `inclusion: { patterns: ["*.csv", "*.xml"] }`.
 
 ### 2.9 `archival` & `retention`
 ```yaml
