@@ -136,7 +136,7 @@ sequenceDiagram
     IP->>IP: business_path = base_path / relative_path
     IP->>IP: filename = original_filename
     Note over IP,AU: audit : RESTORED
-    IP->>FS: mkdir -p parents ; temp → métier (atomique)
+    IP->>FS: mkdir -p parents puis temp → métier (atomique)
     Note over IP,AU: audit : MOVED_TO_BUSINESS_FOLDER
     IP->>LK: release(verrou)
 ```
@@ -163,7 +163,7 @@ flowchart LR
     X[Étape en échec] --> Y[Écrire audit ERROR<br/>avec étape + exception]
     Y --> Z[Déplacement atomique des artefacts → runtime/error/&lt;technical_id&gt;/]
     Z --> W[Libérer le verrou]
-    W --> V[Item visible par l'opérateur ;<br/>jamais supprimé, jamais publié à moitié]
+    W --> V[Item visible par l'opérateur,<br/>jamais supprimé, jamais publié à moitié]
 ```
 
 Les items en quarantaine ne sont **jamais** supprimés automatiquement. La reprise et le
