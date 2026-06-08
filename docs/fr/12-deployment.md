@@ -45,6 +45,28 @@ flowchart TB
   complément de la reprise applicative.
 - **GnuPG** : Gpg4win installé ; `gnupg_home` dédié au compte de service.
 
+### 3bis. Plusieurs instances sur une même machine
+
+Plusieurs instances FileRouter peuvent tourner en **services natifs** sur le même hôte.
+L'installeur accepte `--instance <nom>` : il crée un service au **nom unique**
+`FileRouter_<nom>` et persiste le chemin de config dans la variable d'environnement
+machine **`FILEROUTER_CONFIG_<NOM>`** (le service résout sa config depuis son propre nom).
+
+```bat
+python -m filerouter.service.windows install --instance siteA --config C:\SiteA\config.yaml
+python -m filerouter.service.windows install --instance siteB --config C:\SiteB\config.yaml
+python -m filerouter.service.windows start   --instance siteA
+python -m filerouter.service.windows start   --instance siteB
+```
+
+Sans `--instance`, le nom par défaut reste `FileRouter` et la config est lue depuis
+`FILEROUTER_CONFIG` (mode mono-instance, rétro-compatible).
+
+> **Isolation obligatoire** : chaque instance doit avoir ses **propres** `runtime.root`,
+> `exchange.out`/`exchange.in` et `logs` (et de préférence ses propres `base_folders`).
+> Un exemple complet 2-sites prêt à l'emploi (configs + script de transport) est fourni
+> dans [`docs/examples/two-instance/`](../examples/two-instance/README.md).
+
 ## 4. Linux — systemd
 
 Unité `filerouter.service` (extrait) :

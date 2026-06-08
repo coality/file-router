@@ -1,0 +1,48 @@
+# =============================================================================
+# FileRouter — Site A (SENDER / outbound) — two-instance demo on ONE machine.
+# Pair this with siteB.config.yaml and transport.ps1.
+# =============================================================================
+
+instance:
+  site: PARIS
+  role: outbound          # this instance only produces files into exchange_out
+  workers: 4
+
+# The business alias BIZ is shared with Site B (only the alias travels).
+base_folders:
+  - alias: BIZ
+    path: C:\SiteA\business
+
+mappings:
+  flows:
+    BIZ: BIZ
+  routing:
+    BIZ: FRANKFURT        # informational target_site recorded in the metadata
+
+exchange:
+  out: C:\SiteA\exchange_out
+  in: C:\SiteA\exchange_in     # unused for a pure sender, kept for symmetry
+
+runtime:
+  root: C:\SiteA\runtime       # same volume (C:) as exchange -> atomic publish
+
+naming:
+  pattern: "{flow}_{direction}_{timestamp}_{technical_id}.{extension}"
+  technical_id_strategy: ulid
+  charset: portable
+  meta_suffix: ".meta.json"
+
+hashing:
+  algorithm: SHA-256
+
+encryption:
+  backend: noop           # no encryption for the quick demo
+
+archival:
+  source_policy: archive  # keep the source under runtime/archive after sending
+
+scanning:
+  interval_seconds: 2
+  stability_checks: 2
+  stability_interval_seconds: 1
+  pair_grace_period_seconds: 10

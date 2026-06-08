@@ -1,0 +1,47 @@
+# =============================================================================
+# FileRouter — Site B (RECEIVER / inbound) — two-instance demo on ONE machine.
+# Pair this with siteA.config.yaml and transport.ps1.
+# =============================================================================
+
+instance:
+  site: FRANKFURT
+  role: inbound           # this instance only integrates files from exchange_in
+  workers: 4
+
+# Same alias BIZ as Site A, but a DIFFERENT physical path (local mapping).
+base_folders:
+  - alias: BIZ
+    path: C:\SiteB\business
+
+mappings:
+  flows:
+    BIZ: BIZ
+  routing:
+    BIZ: FRANKFURT
+
+exchange:
+  out: C:\SiteB\exchange_out   # unused for a pure receiver, kept for symmetry
+  in: C:\SiteB\exchange_in
+
+runtime:
+  root: C:\SiteB\runtime       # same volume (C:) as exchange -> atomic publish
+
+naming:
+  pattern: "{flow}_{direction}_{timestamp}_{technical_id}.{extension}"
+  technical_id_strategy: ulid
+  charset: portable
+  meta_suffix: ".meta.json"
+
+hashing:
+  algorithm: SHA-256
+  verify_inbound: true
+
+encryption:
+  backend: noop                  # must match the sender (no encryption here)
+  require_signature_inbound: false
+
+scanning:
+  interval_seconds: 2
+  stability_checks: 2
+  stability_interval_seconds: 1
+  pair_grace_period_seconds: 10
