@@ -1,0 +1,209 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/filerouter/config.schema.json",
+  "title": "FileRouter configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["instance", "base_folders", "exchange", "runtime", "naming", "hashing"],
+  "properties": {
+    "instance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["site", "role"],
+      "properties": {
+        "site": { "type": "string" },
+        "role": { "type": "string", "enum": ["outbound", "inbound", "both"] },
+        "workers": { "type": "integer", "minimum": 1 },
+        "worker_type": { "type": "string", "enum": ["thread", "process"] }
+      }
+    },
+    "base_folders": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["alias", "path"],
+        "properties": {
+          "alias": { "type": "string", "minLength": 1 },
+          "path": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "mappings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "flows": { "type": "object", "additionalProperties": { "type": "string" } },
+        "routing": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    },
+    "exchange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["out", "in"],
+      "properties": {
+        "out": { "type": "string" },
+        "in": { "type": "string" }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root"],
+      "properties": { "root": { "type": "string" } }
+    },
+    "naming": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pattern"],
+      "properties": {
+        "pattern": { "type": "string", "pattern": "\\{technical_id\\}" },
+        "timestamp_format": { "type": "string" },
+        "max_length": { "type": "integer", "minimum": 16 },
+        "technical_id_strategy": { "type": "string", "enum": ["ulid", "uuid4"] },
+        "charset": { "type": "string", "enum": ["portable", "extended"] },
+        "meta_suffix": { "type": "string" }
+      }
+    },
+    "hashing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm"],
+      "properties": {
+        "algorithm": { "type": "string", "const": "SHA-256" },
+        "chunk_size_bytes": { "type": "integer", "minimum": 4096 },
+        "verify_inbound": { "type": "boolean" }
+      }
+    },
+    "encryption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["backend"],
+      "properties": {
+        "backend": { "type": "string", "enum": ["gnupg", "pgpy"] },
+        "gnupg_home": { "type": "string" },
+        "signing_key_id": { "type": "string" },
+        "require_signature_inbound": { "type": "boolean" },
+        "armored": { "type": "boolean" },
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["base_folder_alias", "path_pattern", "enabled"],
+            "properties": {
+              "base_folder_alias": { "type": "string" },
+              "path_pattern": { "type": "string" },
+              "enabled": { "type": "boolean" },
+              "recipient_key_ids": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    "inclusion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "patterns": { "type": "array", "items": { "type": "string" } } }
+    },
+    "exclusion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "patterns": { "type": "array", "items": { "type": "string" } } }
+    },
+    "duplicates": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "outbound_policy": { "type": "string", "enum": ["skip", "reprocess", "error"] },
+        "inbound_policy": { "type": "string", "enum": ["skip", "overwrite", "error"] },
+        "index": { "type": "string" }
+      }
+    },
+    "archival": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source_policy": { "type": "string", "enum": ["archive", "delete"] },
+        "archive_layout": { "type": "string" }
+      }
+    },
+    "retention": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "archive_days": { "type": "integer", "minimum": 0 },
+        "audit_days": { "type": "integer", "minimum": 0 },
+        "logs_days": { "type": "integer", "minimum": 0 },
+        "error_days": { "type": "integer", "minimum": 0 },
+        "dedup_days": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "scanning": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "interval_seconds": { "type": "number", "minimum": 0.1 },
+        "stability_checks": { "type": "integer", "minimum": 1 },
+        "stability_interval_seconds": { "type": "number", "minimum": 0.1 },
+        "pair_grace_period_seconds": { "type": "number", "minimum": 0 }
+      }
+    },
+    "locking": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "lock_ttl_seconds": { "type": "integer", "minimum": 1 },
+        "heartbeat_interval_seconds": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "retry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_attempts": { "type": "integer", "minimum": 1 },
+        "base_delay_seconds": { "type": "number", "minimum": 0 },
+        "backoff": { "type": "string", "enum": ["fixed", "exponential"] },
+        "jitter": { "type": "boolean" }
+      }
+    },
+    "logging": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": { "type": "string", "const": "jsonl" },
+        "streams": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "level": { "type": "string", "enum": ["DEBUG", "INFO", "WARNING", "ERROR"] },
+              "path": { "type": "string" }
+            }
+          }
+        },
+        "rotation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "when": { "type": "string", "enum": ["daily", "size"] },
+            "max_bytes": { "type": "integer", "minimum": 1 },
+            "backup_count": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "compression": { "type": "string", "enum": ["none", "gzip"] }
+      }
+    },
+    "recovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "reconcile_on_start": { "type": "boolean" },
+        "reconcile_interval_seconds": { "type": "integer", "minimum": 1 },
+        "temp_orphan_max_age_seconds": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

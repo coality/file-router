@@ -1,0 +1,122 @@
+# FileRouter — configuration de référence
+# Validée contre docs/schemas/config.schema.json
+
+instance:
+  site: PARIS
+  role: both
+  workers: 8
+  worker_type: thread
+
+base_folders:
+  - alias: SAP_FR
+    path: D:\interfaces\sap\fr
+  - alias: CRM_DE
+    path: E:\interfaces\crm\de
+  - alias: PAYMENT
+    path: F:\payments
+
+mappings:
+  flows:
+    PAYMENT: PAYMENT
+    SAP_FR: SAPFR
+    CRM_DE: CRMDE
+  routing:
+    PAYMENT: FRANKFURT
+    SAP_FR: PARIS
+    CRM_DE: BERLIN
+
+exchange:
+  out: D:\FileRouter\exchange_out
+  in: D:\FileRouter\exchange_in
+
+runtime:
+  root: D:\FileRouter\runtime
+
+naming:
+  pattern: "{flow}_{direction}_{timestamp}_{technical_id}.{extension}"
+  timestamp_format: "%Y%m%dT%H%M%S"
+  max_length: 120
+  technical_id_strategy: ulid
+  charset: portable
+  meta_suffix: ".meta.json"
+
+hashing:
+  algorithm: SHA-256
+  chunk_size_bytes: 1048576
+  verify_inbound: true
+
+encryption:
+  backend: gnupg
+  gnupg_home: D:\FileRouter\keys\gnupg
+  signing_key_id: "0xCAFEBABE"
+  require_signature_inbound: true
+  armored: false
+  rules:
+    - base_folder_alias: SAP_FR
+      path_pattern: "confidential/**"
+      enabled: true
+      recipient_key_ids: ["0xDEADBEEF"]
+    - base_folder_alias: PAYMENT
+      path_pattern: "**"
+      enabled: true
+      recipient_key_ids: ["0xDEADBEEF"]
+
+inclusion:
+  patterns: ["**/*"]
+
+exclusion:
+  patterns:
+    - "**/*.tmp"
+    - "**/*.part"
+    - "**/~$*"
+    - "**/.DS_Store"
+
+duplicates:
+  outbound_policy: skip
+  inbound_policy: skip
+  index: runtime/dedup
+
+archival:
+  source_policy: archive
+  archive_layout: "%Y/%m/%d"
+
+retention:
+  archive_days: 30
+  audit_days: 365
+  logs_days: 90
+  error_days: 0
+  dedup_days: 30
+
+scanning:
+  interval_seconds: 5
+  stability_checks: 3
+  stability_interval_seconds: 2
+  pair_grace_period_seconds: 30
+
+locking:
+  lock_ttl_seconds: 300
+  heartbeat_interval_seconds: 30
+
+retry:
+  max_attempts: 5
+  base_delay_seconds: 2
+  backoff: exponential
+  jitter: true
+
+logging:
+  format: jsonl
+  streams:
+    technical: { level: INFO, path: logs/technical }
+    functional: { level: INFO, path: logs/functional }
+    security: { level: INFO, path: logs/security }
+    admin: { level: INFO, path: logs/admin }
+  rotation:
+    when: daily
+    max_bytes: 104857600
+    backup_count: 30
+  compression: gzip
+
+recovery:
+  reconcile_on_start: true
+  reconcile_interval_seconds: 300
+  temp_orphan_max_age_seconds: 600

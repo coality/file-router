@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0",
+  "technical_id": "ABC123",
+  "direction": "OUT",
+  "source_site": "PARIS",
+  "target_site": "FRANKFURT",
+  "base_folder_alias": "PAYMENT",
+  "relative_path": "clients/contracts/v5/production/2026/06/exports/batch01",
+  "original_filename": "file.csv",
+  "technical_filename": "PAYMENT_OUT_20260608T120000_ABC123.csv",
+  "extension": "csv",
+  "encrypted": true,
+  "size_bytes": 184320,
+  "clear_file_hash": {
+    "algorithm": "SHA-256",
+    "value": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+  },
+  "payload_file_hash": {
+    "algorithm": "SHA-256",
+    "value": "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae"
+  },
+  "encryption": {
+    "scheme": "OpenPGP",
+    "recipient_key_ids": ["0xDEADBEEF"],
+    "signing_key_id": "0xCAFEBABE",
+    "signed": true,
+    "key_epoch": "2026-Q2"
+  },
+  "naming": {
+    "pattern": "{flow}_{direction}_{timestamp}_{technical_id}.{extension}",
+    "timestamp": "20260608T120000"
+  },
+  "creation_date": "2026-06-08T12:00:00Z",
+  "producer": {
+    "app": "FileRouter",
+    "version": "1.0.0",
+    "host": "SRV-A"
+  }
+}

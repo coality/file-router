@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/filerouter/metadata.schema.json",
+  "title": "FileRouter metadata",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "technical_id",
+    "direction",
+    "source_site",
+    "target_site",
+    "base_folder_alias",
+    "relative_path",
+    "original_filename",
+    "encrypted",
+    "clear_file_hash",
+    "payload_file_hash",
+    "creation_date"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" },
+    "technical_id": { "type": "string", "minLength": 1 },
+    "direction": { "type": "string", "enum": ["OUT", "IN"] },
+    "source_site": { "type": "string" },
+    "target_site": { "type": "string" },
+    "base_folder_alias": { "type": "string", "minLength": 1 },
+    "relative_path": {
+      "type": "string",
+      "description": "POSIX-normalized, no leading slash, no '..'",
+      "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$)).*$"
+    },
+    "original_filename": { "type": "string", "minLength": 1 },
+    "technical_filename": { "type": "string" },
+    "extension": { "type": "string" },
+    "encrypted": { "type": "boolean" },
+    "size_bytes": { "type": "integer", "minimum": 0 },
+    "clear_file_hash": { "$ref": "#/$defs/hash" },
+    "payload_file_hash": { "$ref": "#/$defs/hash" },
+    "encryption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scheme", "recipient_key_ids", "signed"],
+      "properties": {
+        "scheme": { "type": "string", "const": "OpenPGP" },
+        "recipient_key_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "signing_key_id": { "type": "string" },
+        "signed": { "type": "boolean" },
+        "key_epoch": { "type": "string" }
+      }
+    },
+    "naming": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pattern": { "type": "string" },
+        "timestamp": { "type": "string" }
+      }
+    },
+    "creation_date": { "type": "string", "format": "date-time" },
+    "producer": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "app": { "type": "string" },
+        "version": { "type": "string" },
+        "host": { "type": "string" }
+      }
+    }
+  },
+  "$defs": {
+    "hash": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "value"],
+      "properties": {
+        "algorithm": { "type": "string", "const": "SHA-256" },
+        "value": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "encrypted": { "const": true } } },
+      "then": { "required": ["encryption"] },
+      "else": { "not": { "required": ["encryption"] } }
+    }
+  ]
+}

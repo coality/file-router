@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/filerouter/audit.schema.json",
+  "title": "FileRouter audit event (one JSON object per JSON-Lines row)",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["technical_id", "seq", "event", "ts"],
+  "properties": {
+    "technical_id": { "type": "string", "minLength": 1 },
+    "seq": { "type": "integer", "minimum": 1 },
+    "event": {
+      "type": "string",
+      "enum": [
+        "DETECTED",
+        "HASH_COMPUTED",
+        "ENCRYPTED",
+        "RENAMED",
+        "MOVED_TO_EXCHANGE_OUT",
+        "RECEIVED_FROM_EXCHANGE_IN",
+        "HASH_VALIDATED",
+        "DECRYPTED",
+        "RESTORED",
+        "MOVED_TO_BUSINESS_FOLDER",
+        "ARCHIVED",
+        "ERROR"
+      ]
+    },
+    "ts": { "type": "string", "format": "date-time" },
+    "direction": { "type": "string", "enum": ["OUT", "IN"] },
+    "host": { "type": "string" },
+    "actor": { "type": "string" },
+    "details": { "type": "object" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "event": { "const": "ERROR" } } },
+      "then": {
+        "properties": {
+          "details": {
+            "type": "object",
+            "required": ["step", "exception_type", "message"],
+            "properties": {
+              "step": { "type": "string" },
+              "exception_type": { "type": "string" },
+              "message": { "type": "string" },
+              "attempt": { "type": "integer", "minimum": 1 },
+              "quarantine_path": { "type": "string" }
+            }
+          }
+        },
+        "required": ["details"]
+      }
+    }
+  ]
+}
